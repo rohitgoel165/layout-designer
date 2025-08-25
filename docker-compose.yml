@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: layoutdb
+      POSTGRES_USER: layout
+      POSTGRES_PASSWORD: layoutpass
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U layout -d layoutdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      context: ./backend
+    container_name: migrate
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./backend/.env
+    command: ["npx","-y","sequelize-cli","db:migrate"]
+    profiles: ["dev","migrate"]
+
+  api:
+    build:
+      context: ./backend
+    container_name: api
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      PORT: "4001"
+      NODE_ENV: "production"
+      SEQUELIZE_SYNC: "false"
+      POSTGRES_HOST: "postgres"
+      POSTGRES_DB: "layoutdb"
+      POSTGRES_USER: "layout"
+      POSTGRES_PASSWORD: "layoutpass"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - api-tmp:/app/tmp
+      - ./backend/public:/app/public
+    ports:
+      - "4001:4001"
+    command: ["node","server.js"]
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: http://localhost:4001/layout-be/api
+    container_name: web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: pgadmin
+    restart: unless-stopped
+    profiles: ["dev"]
+volumes:
+  pg-data:
+  api-tmp: {}
