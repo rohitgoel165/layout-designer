@@ -14,7 +14,6 @@ import {
   SelectValue,
 } from "./ui/select";
 
-
 /** Types */
 export interface LayoutZone {
   id: string;
@@ -26,13 +25,7 @@ export interface LayoutZone {
   content: string;
   isDynamic: boolean;
   variableName?: string;
-  styles: {
-    fontSize?: number;
-    fontWeight?: string;
-    color?: string;
-    backgroundColor?: string;
-    border?: string;
-  };
+  styles: React.CSSProperties; // now accepts textAlign, fontStyle, etc.
 }
 
 type TemplateDef = {
@@ -48,7 +41,6 @@ export interface LayoutDesignerProps {
   templates?: TemplateDef[];
 }
 
-
 /** Logical page size (A4-ish @ ~72dpi) */
 const PAGE_W = 794;
 const PAGE_H = 1123;
@@ -59,11 +51,17 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const MIN_SCALE = 0.4;
 const MAX_SCALE = 3;
 
-const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
-  onExport,
-  onSave,
-  templates = [],
-}) => {
+// Helpers
+const parseTableColumns = (spec: string): string[] => {
+  const m = spec.match(/columns=([^;]+)/i);
+  if (!m) return [];
+  return m[1]
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
+
+const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templates = [] }) => {
   const [zones, setZones] = useState<LayoutZone[]>([]);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -137,16 +135,18 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
         type === "text"
           ? "Sample text"
           : type === "image"
-            ? "image-placeholder.jpg"
-            : type === "table"
-              ? "Table data"
-              : type === "rect"
-                ? ""
-                : "Rich text content",
+          ? "image-placeholder.jpg"
+          : type === "table"
+          ? "columns=Column A|Column B|Column C; data={{Rows}}"
+          : type === "rect"
+          ? ""
+          : "Rich text content",
       isDynamic: false,
       styles: {
         fontSize: type === "text" || type === "richtext" ? 16 : 14,
         fontWeight: "normal",
+        fontStyle: "normal",
+        textAlign: "left",
         color: "#000000",
         backgroundColor: type === "rect" ? "#f5f5f5" : "transparent",
         border: "1px solid #ccc",
@@ -238,11 +238,8 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
     }
   };
 
-  // already declared in your file per the error message, keep this (or use this version)
   const loadSavedLayoutById = (layoutId: string) => {
-    const layout = savedLayouts.find(
-      (l) => String(l._id || (l as any).id || "") === layoutId
-    );
+    const layout = savedLayouts.find((l) => String(l._id || (l as any).id || "") === layoutId);
     if (!layout) return;
 
     const struct = layout.structure;
@@ -321,18 +318,11 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
           </div>
         )}
 
-        {/* Saved Layouts — dropdown like Saved Workflows */}
         {/* Saved Layouts */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <Label className="text-xs font-medium">Saved Layouts</Label>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              title="Refresh"
-              onClick={fetchSavedLayouts}
-            >
+            <Button size="icon" variant="ghost" className="h-7 w-7" title="Refresh" onClick={fetchSavedLayouts}>
               <RotateCcw className="w-4 h-4" />
             </Button>
           </div>
@@ -341,7 +331,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
             value={selectedLayoutId}
             onValueChange={(id) => {
               setSelectedLayoutId(id);
-              loadSavedLayoutById(id);   // <-- fix: call the byId version
+              loadSavedLayoutById(id);
             }}
           >
             <SelectTrigger className="h-8 text-xs text-left">
@@ -350,9 +340,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
 
             <SelectContent className="max-h-60 overflow-auto">
               {savedLayouts.length === 0 ? (
-                <div className="px-3 py-2 text-muted-foreground text-xs">
-                  No saved layouts
-                </div>
+                <div className="px-3 py-2 text-muted-foreground text-xs">No saved layouts</div>
               ) : (
                 savedLayouts.map((l, i) => {
                   const id = String(l._id || (l as any).id || i);
@@ -366,8 +354,6 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
             </SelectContent>
           </Select>
         </div>
-
-
 
         {/* Add Zones */}
         <div>
@@ -401,7 +387,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
             <Button onClick={fetchSavedLayouts} variant="outline" className="w-full h-8 text-xs">
               Refresh Saved
             </Button>
-            <Button onClick={() => handleExport("pdf")} variant="ghost" className="w-full h-8 text-xs">
+            <Button onClick={() => handleExport("json")} variant="ghost" className="w-full h-8 text-xs">
               <Download className="w-3 h-3 mr-2" /> Export (JSON)
             </Button>
           </div>
@@ -438,9 +424,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
               >
                 −
               </Button>
-              <div className="w-16 text-center text-xs tabular-nums">
-                {(scale * 100).toFixed(0)}%
-              </div>
+              <div className="w-16 text-center text-xs tabular-nums">{(scale * 100).toFixed(0)}%</div>
               <Button
                 size="sm"
                 variant="outline"
@@ -456,51 +440,54 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
         </div>
 
         {/* Centered canvas */}
-        <div
-          ref={centerRef}
-          className="flex-1 overflow-auto bg-muted/20 flex items-start justify-center p-6"
-        >
+        <div ref={centerRef} className="flex-1 overflow-auto bg-muted/20 flex items-start justify-center p-6">
           {/* Frame that matches scaled size */}
           <div className="border bg-white shadow-sm" style={{ width: PAGE_W * scale, height: PAGE_H * scale }}>
             {/* Unscaled logical page; visually scaled */}
             <div
               ref={canvasRef}
               className="relative"
-              style={{
-                width: PAGE_W,
-                height: PAGE_H,
-                transform: `scale(${scale})`,
-                transformOrigin: "top left",
-              }}
+              style={{ width: PAGE_W, height: PAGE_H, transform: `scale(${scale})`, transformOrigin: "top left" }}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
               {zones.map((zone) => {
                 const isSelected = selectedZone === zone.id;
-                const fs = clamp(zone.styles.fontSize ?? 16, 10, 28);
+                const rawFS = zone.styles.fontSize;
+                const fs = clamp(
+                  typeof rawFS === "string" ? parseFloat(rawFS) || 16 : (rawFS ?? 16),
+                  10,
+                  28
+                );
+
+                // shared block styles
+                const blockStyle: React.CSSProperties = {
+                  left: zone.x,
+                  top: zone.y,
+                  width: zone.width,
+                  height: zone.height,
+                  backgroundColor: zone.styles.backgroundColor,
+                  border: zone.styles.border || "1px solid #ddd",
+                };
 
                 return (
                   <div
                     key={zone.id}
                     className={`absolute cursor-move ${isSelected ? "ring-2 ring-primary" : ""}`}
-                    style={{
-                      left: zone.x,
-                      top: zone.y,
-                      width: zone.width,
-                      height: zone.height,
-                      backgroundColor: zone.styles.backgroundColor,
-                      border: zone.styles.border || "1px solid #ddd",
-                    }}
+                    style={blockStyle}
                     onMouseDown={(e) => handleMouseDown(e, zone.id)}
                   >
                     <div className="p-1 h-full overflow-hidden">
                       {zone.type === "rect" && <div className="w-full h-full" />}
+
                       {zone.type === "text" && (
                         <div
                           style={{
                             fontSize: fs,
-                            fontWeight: zone.styles.fontWeight,
+                            fontWeight: zone.styles.fontWeight as React.CSSProperties["fontWeight"],
+                            fontStyle: zone.styles.fontStyle as React.CSSProperties["fontStyle"],
+                            textAlign: zone.styles.textAlign as React.CSSProperties["textAlign"],
                             color: zone.styles.color,
                             lineHeight: 1.2,
                             wordBreak: "break-word",
@@ -510,18 +497,59 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
                           {zone.isDynamic ? `{{${zone.variableName}}}` : zone.content}
                         </div>
                       )}
+
                       {zone.type === "image" && (
                         <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 text-[12px]">
                           {zone.isDynamic ? `{{${zone.variableName}}}` : zone.content}
                         </div>
                       )}
+
                       {zone.type === "table" && (
-                        <div className="text-[12px]">
-                          {zone.isDynamic ? `{{${zone.variableName}}}` : "Table: " + zone.content}
+                        <div className="text-[12px] h-full flex flex-col">
+                          {/* header preview from columns=... */}
+                          {(() => {
+                            const headers = parseTableColumns(zone.content || "");
+                            if (headers.length === 0) {
+                              return (
+                                <div className="text-muted-foreground">
+                                  {zone.isDynamic ? `{{${zone.variableName}}}` : "Table: " + (zone.content || "(no spec)")}
+                                </div>
+                              );
+                            }
+                            return (
+                              <>
+                                <div
+                                  className="grid border-b"
+                                  style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}
+                                >
+                                  {headers.map((h, i) => (
+                                    <div key={i} className="px-2 py-1 font-medium border-r last:border-r-0">
+                                      {h}
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="text-muted-foreground px-2 py-1">
+                                  {zone.isDynamic
+                                    ? `rows: {{${zone.variableName}}}`
+                                    : "(Static preview — provide rows via data={{VarName}})"}
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
+
                       {zone.type === "richtext" && (
-                        <div className="text-[12px]">
+                        <div
+                          className="text-[12px] whitespace-pre-wrap"
+                          style={{
+                            fontSize: fs,
+                            fontWeight: zone.styles.fontWeight as React.CSSProperties["fontWeight"],
+                            fontStyle: zone.styles.fontStyle as React.CSSProperties["fontStyle"],
+                            textAlign: zone.styles.textAlign as React.CSSProperties["textAlign"],
+                            color: zone.styles.color,
+                          }}
+                        >
                           {zone.isDynamic ? `{{${zone.variableName}}}` : zone.content}
                         </div>
                       )}
@@ -529,12 +557,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
 
                     {isSelected && (
                       <div className="absolute -top-7 right-0 flex space-x-1">
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => deleteZone(zone.id)}
-                        >
+                        <Button size="sm" variant="destructive" className="h-7 px-2 text-xs" onClick={() => deleteZone(zone.id)}>
                           <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
@@ -554,9 +577,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
           <div className="space-y-3">
             <div>
               <Label className="text-xs">Zone Type</Label>
-              <Badge variant="secondary" className="ml-2 text-[10px]">
-                {selectedZoneData.type}
-              </Badge>
+              <Badge variant="secondary" className="ml-2 text-[10px]">{selectedZoneData.type}</Badge>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -565,9 +586,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
                 <Input
                   type="number"
                   value={selectedZoneData.x}
-                  onChange={(e) =>
-                    updateZone(selectedZoneData.id, { x: parseInt(e.target.value || "0") })
-                  }
+                  onChange={(e) => updateZone(selectedZoneData.id, { x: parseInt(e.target.value || "0") })}
                   className="h-8"
                 />
               </div>
@@ -576,9 +595,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
                 <Input
                   type="number"
                   value={selectedZoneData.y}
-                  onChange={(e) =>
-                    updateZone(selectedZoneData.id, { y: parseInt(e.target.value || "0") })
-                  }
+                  onChange={(e) => updateZone(selectedZoneData.id, { y: parseInt(e.target.value || "0") })}
                   className="h-8"
                 />
               </div>
@@ -590,9 +607,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
                 <Input
                   type="number"
                   value={selectedZoneData.width}
-                  onChange={(e) =>
-                    updateZone(selectedZoneData.id, { width: parseInt(e.target.value || "0") })
-                  }
+                  onChange={(e) => updateZone(selectedZoneData.id, { width: parseInt(e.target.value || "0") })}
                   className="h-8"
                 />
               </div>
@@ -601,9 +616,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
                 <Input
                   type="number"
                   value={selectedZoneData.height}
-                  onChange={(e) =>
-                    updateZone(selectedZoneData.id, { height: parseInt(e.target.value || "0") })
-                  }
+                  onChange={(e) => updateZone(selectedZoneData.id, { height: parseInt(e.target.value || "0") })}
                   className="h-8"
                 />
               </div>
@@ -613,20 +626,14 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
               <>
                 <div>
                   <Label className="text-xs">Content</Label>
-                  <Textarea
-                    value={selectedZoneData.content}
-                    onChange={(e) => updateZone(selectedZoneData.id, { content: e.target.value })}
-                    rows={3}
-                  />
+                  <Textarea value={selectedZoneData.content} onChange={(e) => updateZone(selectedZoneData.id, { content: e.target.value })} rows={3} />
                 </div>
 
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
                     checked={selectedZoneData.isDynamic}
-                    onChange={(e) =>
-                      updateZone(selectedZoneData.id, { isDynamic: e.target.checked })
-                    }
+                    onChange={(e) => updateZone(selectedZoneData.id, { isDynamic: e.target.checked })}
                   />
                   <Label className="text-xs">Dynamic Content</Label>
                 </div>
@@ -636,45 +643,116 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
                     <Label className="text-xs">Variable Name</Label>
                     <Input
                       value={selectedZoneData.variableName || ""}
-                      onChange={(e) =>
-                        updateZone(selectedZoneData.id, { variableName: e.target.value })
-                      }
+                      onChange={(e) => updateZone(selectedZoneData.id, { variableName: e.target.value })}
                       placeholder="variable_name"
                       className="h-8"
                     />
                   </div>
                 )}
 
-                <div>
-                  <Label className="text-xs">Font Size (px)</Label>
-                  <Input
-                    type="number"
-                    value={selectedZoneData.styles.fontSize}
-                    onChange={(e) =>
-                      updateZone(selectedZoneData.id, {
-                        styles: {
-                          ...selectedZoneData.styles,
-                          fontSize: parseInt(e.target.value || "0"),
-                        },
-                      })
-                    }
-                    className="h-8"
-                  />
-                  <div className="text-[10px] text-muted-foreground">
-                    Tip: 12–24px works well; canvas scales to fit.
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Font Size (px)</Label>
+                    <Input
+                      type="number"
+                      value={typeof selectedZoneData.styles.fontSize === "string" ? (parseFloat(selectedZoneData.styles.fontSize) || 0) : ((selectedZoneData.styles.fontSize as number) || 0)}
+                      onChange={(e) =>
+                        updateZone(selectedZoneData.id, {
+                          styles: {
+                            ...selectedZoneData.styles,
+                            fontSize: parseInt(e.target.value || "0"),
+                          },
+                        })
+                      }
+                      className="h-8"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Font Weight</Label>
+                    <Select
+                      value={(selectedZoneData.styles.fontWeight as string) || "normal"}
+                      onValueChange={(v) =>
+                        updateZone(selectedZoneData.id, { styles: { ...selectedZoneData.styles, fontWeight: v as React.CSSProperties["fontWeight"] } })
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="normal">normal</SelectItem>
+                        <SelectItem value="bold">bold</SelectItem>
+                        <SelectItem value="500">500</SelectItem>
+                        <SelectItem value="600">600</SelectItem>
+                        <SelectItem value="700">700</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Font Style</Label>
+                    <Select
+                      value={(selectedZoneData.styles.fontStyle as string) || "normal"}
+                      onValueChange={(v) =>
+                        updateZone(selectedZoneData.id, { styles: { ...selectedZoneData.styles, fontStyle: v as React.CSSProperties["fontStyle"] } })
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="normal">normal</SelectItem>
+                        <SelectItem value="italic">italic</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Text Align</Label>
+                    <Select
+                      value={(selectedZoneData.styles.textAlign as string) || "left"}
+                      onValueChange={(v) =>
+                        updateZone(selectedZoneData.id, { styles: { ...selectedZoneData.styles, textAlign: v as React.CSSProperties["textAlign"] } })
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="left">left</SelectItem>
+                        <SelectItem value="center">center</SelectItem>
+                        <SelectItem value="right">right</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Text Color</Label>
+                    <Input
+                      type="color"
+                      value={(selectedZoneData.styles.color as string) || "#000000"}
+                      onChange={(e) => updateZone(selectedZoneData.id, { styles: { ...selectedZoneData.styles, color: e.target.value } })}
+                      className="h-8"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Background</Label>
+                    <Input
+                      type="color"
+                      value={(selectedZoneData.styles.backgroundColor as string) || "#ffffff"}
+                      onChange={(e) => updateZone(selectedZoneData.id, { styles: { ...selectedZoneData.styles, backgroundColor: e.target.value } })}
+                      className="h-8"
+                    />
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-xs">Text Color</Label>
+                  <Label className="text-xs">Border (CSS)</Label>
                   <Input
-                    type="color"
-                    value={selectedZoneData.styles.color}
-                    onChange={(e) =>
-                      updateZone(selectedZoneData.id, {
-                        styles: { ...selectedZoneData.styles, color: e.target.value },
-                      })
-                    }
+                    value={(selectedZoneData.styles.border as string) || "1px solid #ccc"}
+                    onChange={(e) => updateZone(selectedZoneData.id, { styles: { ...selectedZoneData.styles, border: e.target.value } })}
                     className="h-8"
                   />
                 </div>
@@ -687,24 +765,16 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({
                   <Label className="text-xs">Fill / Background</Label>
                   <Input
                     type="color"
-                    value={selectedZoneData.styles.backgroundColor || "#f5f5f5"}
-                    onChange={(e) =>
-                      updateZone(selectedZoneData.id, {
-                        styles: { ...selectedZoneData.styles, backgroundColor: e.target.value },
-                      })
-                    }
+                    value={(selectedZoneData.styles.backgroundColor as string) || "#f5f5f5"}
+                    onChange={(e) => updateZone(selectedZoneData.id, { styles: { ...selectedZoneData.styles, backgroundColor: e.target.value } })}
                     className="h-8"
                   />
                 </div>
                 <div>
                   <Label className="text-xs">Border (CSS)</Label>
                   <Input
-                    value={selectedZoneData.styles.border || "1px solid #ccc"}
-                    onChange={(e) =>
-                      updateZone(selectedZoneData.id, {
-                        styles: { ...selectedZoneData.styles, border: e.target.value },
-                      })
-                    }
+                    value={(selectedZoneData.styles.border as string) || "1px solid #ccc"}
+                    onChange={(e) => updateZone(selectedZoneData.id, { styles: { ...selectedZoneData.styles, border: e.target.value } })}
                     className="h-8"
                   />
                 </div>

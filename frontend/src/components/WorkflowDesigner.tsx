@@ -234,7 +234,15 @@ export function WorkflowDesigner({
         icon: FileText,
         inputs: [],
         outputs: [{ id: "data", label: "Data", type: "tabular" }],
-        config: { filePath: "", sheetName: "Sheet1", hasHeaders: true, __file: null, __fileDataUrl: null, __rows: null },
+        // Default to payslip tabs; user can overwrite.
+        config: {
+          filePath: "",
+          sheetName: "Payslip,Earnings,Deductions",
+          hasHeaders: true,
+          __file: null,
+          __fileDataUrl: null,
+          __rows: null,
+        },
       },
       {
         subtype: "csv",
@@ -530,8 +538,69 @@ export function WorkflowDesigner({
           }
 
           if (file) {
-            const parsed = await uploadExcel(file, excelNode.config?.sheetName);
-            excelData = Array.isArray(parsed) ? parsed : parsed?.rows || parsed?.data || null;
+            const sheetSpec = String(excelNode.config?.sheetName || "").trim();
+
+            // Support comma-separated sheet names (e.g., "Payslip,Earnings,Deductions")
+            if (sheetSpec.includes(",")) {
+              const names = sheetSpec
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
+
+              const sheets: Record<string, any[]> = {};
+
+              for (const nm of names) {
+                try {
+                  const parsed = await uploadExcel(file, nm);
+                  const rows = Array.isArray(parsed) ? parsed : parsed?.rows || parsed?.data || [];
+                  sheets[nm] = rows;
+                } catch (e) {
+                  console.warn(`uploadExcel failed for sheet "${nm}":`, e);
+                  sheets[nm] = [];
+                }
+              }
+
+              // Special join for Payslip workbook (header + two arrays)
+              if (sheets["Payslip"] && (sheets["Earnings"] || sheets["Deductions"])) {
+                const pay = sheets["Payslip"] || [];
+                const earn = sheets["Earnings"] || [];
+                const ded = sheets["Deductions"] || [];
+
+                const keyOf = (r: any) => `${r.EmpCode}|${r.PayMonth}|${r.PayYear}`;
+                const groupByKey = (rows: any[]) => {
+                  const m = new Map<string, any[]>();
+                  for (const r of rows) {
+                    const k = keyOf(r);
+                    if (!m.has(k)) m.set(k, []);
+                    m.get(k)!.push(r);
+                  }
+                  return m;
+                };
+
+                const earnMap = groupByKey(earn);
+                const dedMap = groupByKey(ded);
+
+                excelData = pay.map((p: any) => ({
+                  ...p,
+                  Earnings: (earnMap.get(keyOf(p)) || []).map((r: any) => ({
+                    Component: r.Component,
+                    Amount: Number(r.Amount) || 0,
+                  })),
+                  Deductions: (dedMap.get(keyOf(p)) || []).map((r: any) => ({
+                    Component: r.Component,
+                    Amount: Number(r.Amount) || 0,
+                  })),
+                }));
+              } else {
+                // Fallback: use the first available sheet with data
+                const first = names.find((n) => sheets[n]?.length) || names[0];
+                excelData = sheets[first] || [];
+              }
+            } else {
+              // Single-sheet mode (previous behavior)
+              const parsed = await uploadExcel(file, sheetSpec || "");
+              excelData = Array.isArray(parsed) ? parsed : parsed?.rows || parsed?.data || null;
+            }
 
             if (excelData) {
               updateNode(excelNode.id, {
@@ -991,7 +1060,7 @@ export function WorkflowDesigner({
                 zones: Array.isArray(l.structure?.zones) ? (l.structure.zones as LayoutZone[]) : [],
               }))}
 
-            // ✅ these were missing:
+            // ✅ keep these
             onUpdateNode={(updates) => updateNode(selectedNodeData.id, updates)}
             onDeleteNode={() => deleteNode(selectedNodeData.id)}
           />
@@ -1212,8 +1281,13 @@ function NodePropertiesPanel({
               </div>
             </div>
             <div>
-              <Label className={LABEL_SM}>Sheet Name</Label>
-              <Input className="h-8 text-[12px]" value={node.config.sheetName || "Sheet1"} onChange={(e) => updateConfig("sheetName", e.target.value)} />
+              <Label className={LABEL_SM}>Sheet Name(s) (comma-separated)</Label>
+              <Input
+                className="h-8 text-[12px]"
+                value={node.config.sheetName || "Payslip,Earnings,Deductions"}
+                onChange={(e) => updateConfig("sheetName", e.target.value)}
+                placeholder="Payslip,Earnings,Deductions"
+              />
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -1282,7 +1356,6 @@ function NodePropertiesPanel({
             </div>
           </div>
         );
-
 
       case "qrcode":
         return (

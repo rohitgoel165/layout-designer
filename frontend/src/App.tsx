@@ -8,7 +8,6 @@ import LayoutDesigner from "./components/LayoutDesigner";
 import type { LayoutZone } from "./components/LayoutDesigner";
 import PRESET_TEMPLATES from "./templates/presets";
 
-
 // ✅ Import only the component here
 import JobsDashboard from "./components/JobsDashboard";
 
@@ -20,6 +19,10 @@ import { Migration, MigrationTransaction } from "./components/Migration";
 import { WorkflowDesigner, Workflow, WorkflowExecution } from "./components/WorkflowDesigner";
 
 import { Layout, Briefcase, GitBranch, ArrowRightLeft, Workflow as WorkflowIcon } from "lucide-react";
+console.log("PRESETS:", PRESET_TEMPLATES.map(p => p.id));
+
+// NEW: include JSON as a supported export format to match LayoutDesigner
+export type ExportFormat = "pdf" | "html" | "png" | "tiff" | "json";
 
 export default function App() {
   const [zones, setZones] = useState<LayoutZone[]>([]);
@@ -194,58 +197,69 @@ export default function App() {
     setCurrentVersion(sampleVersions.find((v) => v.isActive) || sampleVersions[0]);
   }, []);
 
-  const handleExport = async (format: string, exportZones: LayoutZone[]) => {
-    const newJob: Job = {
-      id: `job-${Date.now()}`,
-      layoutId: "layout-current",
-      layoutName: "Current Layout",
-      type: "export",
-      format: format as "pdf" | "html" | "png" | "tiff",
-      status: "processing",
-      progress: 0,
-      createdAt: new Date(),
-      requestData: { zones: exportZones, format },
-      logs: [
-        { id: `log-${Date.now()}`, timestamp: new Date(), level: "info", message: `${format.toUpperCase()} export started` },
-      ],
-    };
+// Accept string to satisfy LayoutDesigner, then normalize to our allowed set
+const handleExport = async (format: string, exportZones: LayoutZone[]) => {
+  const allowed = ["pdf", "html", "png", "tiff", "json"] as const;
+  type Allowed = typeof allowed[number];
+  const fmt: Allowed = (allowed.includes(format as any) ? (format as Allowed) : "json");
 
-    setJobs((prev) => [newJob, ...prev]);
-    toast(`${format.toUpperCase()} export started`);
+  const newJob: Job = {
+    id: `job-${Date.now()}`,
+    layoutId: "layout-current",
+    layoutName: "Current Layout",
+    type: "export",
+    format: fmt as Job["format"],
+    status: "processing",
+    progress: 0,
+    createdAt: new Date(),
+    requestData: { zones: exportZones, format: fmt },
+    logs: [
+      { id: `log-${Date.now()}`, timestamp: new Date(), level: "info", message: `${fmt.toUpperCase()} export started` },
+    ],
+  };
 
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 30;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
+  setJobs((prev) => [newJob, ...prev]);
+  toast(`${fmt.toUpperCase()} export started`);
 
-        setJobs((prev) =>
-          prev.map((job) =>
-            job.id === newJob.id
-              ? {
+  // Simulate work
+  let progress = 0;
+  const interval = setInterval(() => {
+    progress += Math.random() * 30;
+    if (progress >= 100) {
+      progress = 100;
+      clearInterval(interval);
+
+      setJobs((prev) =>
+        prev.map((job) =>
+          job.id === newJob.id
+            ? {
                 ...job,
                 status: "completed",
                 progress: 100,
                 completedAt: new Date(),
-                responseData: { downloadUrl: `https://example.com/export.${format}` },
+                responseData: {
+                  downloadUrl: fmt === "json"
+                    ? "https://example.com/export.json"
+                    : `https://example.com/export.${fmt}`,
+                },
                 logs: [
                   ...job.logs,
-                  { id: `log-${Date.now()}`, timestamp: new Date(), level: "info", message: `${format.toUpperCase()} export completed successfully` },
+                  { id: `log-${Date.now()}`, timestamp: new Date(), level: "info", message: `${fmt.toUpperCase()} export completed successfully` },
                 ],
               }
-              : job
-          )
-        );
+            : job
+        )
+      );
 
-        toast(`${format.toUpperCase()} export completed!`);
-      } else {
-        setJobs((prev) => prev.map((job) => (job.id === newJob.id ? { ...job, progress: Math.round(progress) } : job)));
-      }
-    }, 1000);
+      toast(`${fmt.toUpperCase()} export completed!`);
+    } else {
+      setJobs((prev) => prev.map((job) => (job.id === newJob.id ? { ...job, progress: Math.round(progress) } : job)));
+    }
+  }, 1000);
 
-    setActiveTab("jobs");
-  };
+  setActiveTab("jobs");
+};
+
 
   const handleMigrationJob = (transaction: Omit<MigrationTransaction, "id" | "createdAt" | "logs">) => {
     const migrationJob: Job = {
@@ -286,15 +300,15 @@ export default function App() {
           prev.map((job) =>
             job.id === migrationJob.id
               ? {
-                ...job,
-                status: "completed",
-                progress: 100,
-                processedItems,
-                failedItems,
-                completedAt: new Date(),
-                responseData: { successful: processedItems - failedItems, failed: failedItems, migrationUrl: `https://example.com/${migrationJob.id}` },
-                logs: [...job.logs, { id: `log-${Date.now()}`, timestamp: new Date(), level: "info", message: `Migration completed: ${processedItems - failedItems} successful, ${failedItems} failed` }],
-              }
+                  ...job,
+                  status: "completed",
+                  progress: 100,
+                  processedItems,
+                  failedItems,
+                  completedAt: new Date(),
+                  responseData: { successful: processedItems - failedItems, failed: failedItems, migrationUrl: `https://example.com/${migrationJob.id}` },
+                  logs: [...job.logs, { id: `log-${Date.now()}`, timestamp: new Date(), level: "info", message: `Migration completed: ${processedItems - failedItems} successful, ${failedItems} failed` }],
+                }
               : job
           )
         );
@@ -412,22 +426,22 @@ export default function App() {
           prev.map((job) =>
             job.id === jobId
               ? {
-                ...job,
-                status: "completed",
-                progress: 100,
-                executedNodes,
-                completedAt: new Date(),
-                responseData: job.responseData ?? { outputs: [] },
-                logs: [
-                  ...job.logs,
-                  {
-                    id: `log-${Date.now()}`,
-                    timestamp: new Date(),
-                    level: "info",
-                    message: `Workflow completed: ${executedNodes}/${totalNodes} nodes executed successfully`,
-                  },
-                ],
-              }
+                  ...job,
+                  status: "completed",
+                  progress: 100,
+                  executedNodes,
+                  completedAt: new Date(),
+                  responseData: job.responseData ?? { outputs: [] },
+                  logs: [
+                    ...job.logs,
+                    {
+                      id: `log-${Date.now()}`,
+                      timestamp: new Date(),
+                      level: "info",
+                      message: `Workflow completed: ${executedNodes}/${totalNodes} nodes executed successfully`,
+                    },
+                  ],
+                }
               : job
           )
         );
@@ -471,15 +485,15 @@ export default function App() {
       prev.map((j) =>
         j.id === jobId
           ? {
-            ...j,
-            status: "processing",
-            progress: 0,
-            errorMessage: undefined,
-            logs: [
-              ...j.logs,
-              { id: `log-${Date.now()}`, timestamp: new Date(), level: "info", message: "Job retried" },
-            ],
-          }
+              ...j,
+              status: "processing",
+              progress: 0,
+              errorMessage: undefined,
+              logs: [
+                ...j.logs,
+                { id: `log-${Date.now()}`, timestamp: new Date(), level: "info", message: "Job retried" },
+              ],
+            }
           : j
       )
     );
@@ -563,23 +577,15 @@ export default function App() {
 
         <TabsContent value="designer" className="h-full m-0">
           <LayoutDesigner
-            // NEW: give the gallery to the designer
-            templates={PRESET_TEMPLATES.map((p) => ({
-              id: p.id,
-              name: p.name,
-              structure: { zones: p.zones } // <-- wrap zones into structure
-            }))}
+            // NEW: give the gallery to the designer (wrap zones in structure)
+            templates={PRESET_TEMPLATES.map((p) => ({ id: p.id, name: p.name, structure: { zones: p.zones } }))}
             onExport={handleExport}
             onSave={handleSaveLayout}
           />
         </TabsContent>
 
         <TabsContent value="workflow" className="h-full m-0">
-          <WorkflowDesigner
-            layouts={availableLayouts}
-            onExecuteWorkflow={handleWorkflowExecution}
-            onSaveWorkflow={handleSaveWorkflow}
-          />
+          <WorkflowDesigner layouts={availableLayouts} onExecuteWorkflow={handleWorkflowExecution} onSaveWorkflow={handleSaveWorkflow} />
         </TabsContent>
 
         <TabsContent value="migration" className="h-full m-0">
@@ -587,12 +593,7 @@ export default function App() {
         </TabsContent>
 
         <TabsContent value="jobs" className="h-full m-0">
-          <JobsDashboard
-            jobs={jobs}
-            onDeleteJob={handleDeleteJob}
-            onRetryJob={handleRetryJob}
-            onDownloadResult={handleDownloadResult}
-          />
+          <JobsDashboard jobs={jobs} onDeleteJob={handleDeleteJob} onRetryJob={handleRetryJob} onDownloadResult={handleDownloadResult} />
         </TabsContent>
 
         <TabsContent value="versions" className="h-full m-0">
