@@ -8,7 +8,7 @@ export type Preset = {
 };
 
 export const PRESETS: Preset[] = [
-  // ===== Existing presets =====
+  /* ====== existing ====== */
   {
     id: "letter-basic",
     name: "Letter – Greeting",
@@ -18,7 +18,7 @@ export const PRESETS: Preset[] = [
         type: "rect",
         x: 40,
         y: 40,
-        width: 520,
+        width: 515,
         height: 100,
         content: "",
         isDynamic: false,
@@ -118,7 +118,7 @@ export const PRESETS: Preset[] = [
         y: 70,
         width: 150,
         height: 150,
-        content: "qr-placeholder.png", // or make dynamic with {{QrPath}}
+        content: "qr-placeholder.png",
         isDynamic: false,
         styles: { border: "1px solid #ccc", backgroundColor: "transparent" },
       },
@@ -136,103 +136,364 @@ export const PRESETS: Preset[] = [
     ],
   },
 
-  // ===== New: Invoice (GST-style, India) =====
+  /* ====== NEW: Invoice – GST (India) ====== */
   {
-    id: "invoice-gst",
-    name: "Invoice – Detailed (GST)",
+    id: "invoice-gst-a4",
+    name: "Invoice – GST (A4, India)",
     zones: [
-      // Header band
-      { id: "hdr-rect", type: "rect", x: 40, y: 20, width: 520, height: 120, content: "", isDynamic: false, styles: { border: "1px solid #999", backgroundColor: "transparent" } },
-      { id: "hdr-title", type: "text", x: 50, y: 30, width: 250, height: 40, content: "TAX INVOICE", isDynamic: false, styles: { fontSize: 18, fontWeight: "bold", color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" } },
-      { id: "hdr-company", type: "text", x: 50, y: 60, width: 320, height: 22, content: "{{CompanyName}}", isDynamic: true, styles: { fontSize: 14, fontWeight: "bold", color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" } },
-      { id: "hdr-address", type: "text", x: 50, y: 82, width: 320, height: 46, content: "{{CompanyAddress}}", isDynamic: true, styles: { fontSize: 12, color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" } },
-      { id: "hdr-gstin", type: "text", x: 50, y: 112, width: 200, height: 22, content: "GSTIN: {{CompanyGSTIN}}", isDynamic: true, styles: { fontSize: 12, color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" } },
-      // Invoice meta box
-      { id: "meta-rect", type: "rect", x: 360, y: 30, width: 200, height: 100, content: "", isDynamic: false, styles: { border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "meta-inv", type: "text", x: 370, y: 40, width: 180, height: 20, content: "Invoice No: {{InvoiceNo}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent", color: "#000" } },
-      { id: "meta-date", type: "text", x: 370, y: 60, width: 180, height: 20, content: "Date: {{InvoiceDate}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent", color: "#000" } },
-      { id: "meta-po", type: "text", x: 370, y: 80, width: 180, height: 20, content: "PO No: {{PONumber}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent", color: "#000" } },
-      // Bill/Ship To
-      { id: "bill-rect", type: "rect", x: 40, y: 150, width: 260, height: 100, content: "", isDynamic: false, styles: { border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ship-rect", type: "rect", x: 300, y: 150, width: 260, height: 100, content: "", isDynamic: false, styles: { border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "bill-to-title", type: "text", x: 50, y: 156, width: 240, height: 18, content: "Bill To", isDynamic: false, styles: { fontSize: 12, fontWeight: "bold", color: "#000", border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "bill-to", type: "text", x: 50, y: 176, width: 240, height: 64, content: "{{BillToName}}\n{{BillToAddress}}\nGSTIN: {{BillToGSTIN}}", isDynamic: true, styles: { fontSize: 12, color: "#000", border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ship-to-title", type: "text", x: 310, y: 156, width: 240, height: 18, content: "Ship To", isDynamic: false, styles: { fontSize: 12, fontWeight: "bold", color: "#000", border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ship-to", type: "text", x: 310, y: 176, width: 240, height: 64, content: "{{ShipToName}}\n{{ShipToAddress}}", isDynamic: true, styles: { fontSize: 12, color: "#000", border: "1px solid #ccc", backgroundColor: "transparent" } },
-      // Items table
-      // NOTE: For the table renderer, read column headers from the content string using 'columns='; rows from {{LineItems}}
-      { id: "items-table", type: "table", x: 40, y: 270, width: 520, height: 240, content: "columns=Item|HSN/SAC|Qty|Rate|Tax %|Amount; data={{LineItems}}", isDynamic: true, styles: { border: "1px solid #333", backgroundColor: "transparent" } },
-      // Totals box
-      { id: "totals-rect", type: "rect", x: 360, y: 520, width: 200, height: 120, content: "", isDynamic: false, styles: { border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "totals-sub", type: "text", x: 370, y: 530, width: 180, height: 18, content: "Subtotal: {{SubTotal}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent", color: "#000" } },
-      { id: "totals-sgst", type: "text", x: 370, y: 548, width: 180, height: 18, content: "SGST ({{SGSTPct}}%): {{SGST}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "totals-cgst", type: "text", x: 370, y: 566, width: 180, height: 18, content: "CGST ({{CGSTPct}}%): {{CGST}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "totals-igst", type: "text", x: 370, y: 584, width: 180, height: 18, content: "IGST ({{IGSTPct}}%): {{IGST}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "totals-grand", type: "text", x: 370, y: 602, width: 180, height: 22, content: "Grand Total: {{GrandTotal}}", isDynamic: true, styles: { fontSize: 14, fontWeight: "bold", border: "1px solid #ccc", backgroundColor: "transparent" } },
-      // Footer terms
-      { id: "terms-title", type: "text", x: 40, y: 520, width: 300, height: 18, content: "Terms & Notes", isDynamic: false, styles: { fontSize: 12, fontWeight: "bold", border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "terms", type: "text", x: 40, y: 540, width: 300, height: 80, content: "{{Terms}}", isDynamic: true, styles: { fontSize: 11, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "bank", type: "text", x: 40, y: 626, width: 520, height: 40, content: "Bank: {{BankName}} | A/C: {{BankAccount}} | IFSC: {{IFSC}}", isDynamic: true, styles: { fontSize: 11, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "sign", type: "text", x: 380, y: 650, width: 180, height: 40, content: "For {{CompanyName}}\nAuthorised Signatory", isDynamic: true, styles: { fontSize: 11, textAlign: "right", border: "1px solid #ccc", backgroundColor: "transparent" } },
+      // header band
+      {
+        id: "hdr-rect",
+        type: "rect",
+        x: 40,
+        y: 30,
+        width: 515,
+        height: 110,
+        content: "",
+        isDynamic: false,
+        styles: { backgroundColor: "transparent", border: "1px solid #999" },
+      },
+      // logo
+      {
+        id: "img-logo",
+        type: "image",
+        x: 52,
+        y: 44,
+        width: 80,
+        height: 80,
+        content: "logo-placeholder.png",
+        isDynamic: true,
+        variableName: "companyLogo", // ✅ match helpers / NodePropertiesPanel
+        styles: { border: "1px solid #ccc", backgroundColor: "transparent" },
+      },
+      // company name & address
+      {
+        id: "txt-company",
+        type: "text",
+        x: 140,
+        y: 48,
+        width: 420,
+        height: 36,
+        content: "{{CompanyName}}",
+        isDynamic: false,
+        styles: { fontSize: 20, fontWeight: "bold", color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
+      {
+        id: "txt-company-addr",
+        type: "text",
+        x: 140,
+        y: 82,
+        width: 515,
+        height: 46,
+        content: "{{CompanyAddress}}",
+        isDynamic: false,
+        styles: { fontSize: 12, color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
+      // invoice meta
+      {
+        id: "txt-inv-meta",
+        type: "text",
+        x: 590,
+        y: 48,
+        width: 150,
+        height: 72,
+        content: "INVOICE\nNo: {{InvoiceNo}}\nDate: {{InvoiceDate}}",
+        isDynamic: false,
+        styles: { fontSize: 12, fontWeight: "bold", color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
+
+      // parties
+      {
+        id: "rect-billto",
+        type: "rect",
+        x: 40,
+        y: 150,
+        width: 357,
+        height: 110,
+        content: "",
+        isDynamic: false,
+        styles: { backgroundColor: "transparent", border: "1px solid #999" },
+      },
+      {
+        id: "rect-shipto",
+        type: "rect",
+        x: 397,
+        y: 150,
+        width: 357,
+        height: 110,
+        content: "",
+        isDynamic: false,
+        styles: { backgroundColor: "transparent", border: "1px solid #999" },
+      },
+      {
+        id: "txt-billto",
+        type: "text",
+        x: 50,
+        y: 160,
+        width: 337,
+        height: 90,
+        content: "Bill To:\n{{BillToName}}\n{{BillToAddress}}\nGSTIN: {{BillToGSTIN}}",
+        isDynamic: false,
+        styles: { fontSize: 12, color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
+      {
+        id: "txt-shipto",
+        type: "text",
+        x: 407,
+        y: 160,
+        width: 337,
+        height: 90,
+        content: "Ship To:\n{{ShipToName}}\n{{ShipToAddress}}\nGSTIN: {{ShipToGSTIN}}",
+        isDynamic: false,
+        styles: { fontSize: 12, color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
+
+      // items table
+      {
+        id: "tbl-items",
+        type: "table",
+        x: 40,
+        y: 272,
+        width: 515,
+        height: 360,
+        content: JSON.stringify(
+          {
+            columns: [
+              { key: "description", label: "Description", width: 260 },
+              { key: "hsn", label: "HSN/SAC", width: 80 },
+              { key: "qty", label: "Qty", width: 60, align: "right" },
+              { key: "rate", label: "Rate", width: 80, align: "right", format: "currency" },
+              { key: "amount", label: "Amount", width: 100, align: "right", format: "currency" },
+              { key: "gst", label: "GST %", width: 60, align: "right" },
+            ],
+            dataVar: "Items",
+          },
+          null,
+          2
+        ),
+        isDynamic: true,
+        variableName: "Items",
+        styles: { backgroundColor: "transparent", border: "1px solid #999" },
+      },
+
+      // totals
+      {
+        id: "txt-subtotals",
+        type: "text",
+        x: 440,
+        y: 640,
+        width: 314,
+        height: 80,
+        content:
+          "Sub-Total: {{SubTotal}}\nCGST: {{CGST}}\nSGST: {{SGST}}\nIGST: {{IGST}}\nGrand Total: {{GrandTotal}}",
+        isDynamic: false,
+        styles: { fontSize: 12, fontWeight: "bold", color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
+      {
+        id: "txt-words",
+        type: "text",
+        x: 40,
+        y: 640,
+        width: 380,
+        height: 60,
+        content: "Amount in words:\n{{AmountInWords}}",
+        isDynamic: false,
+        styles: { fontSize: 12, color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
     ],
   },
 
-  // ===== New: Bill / Simple Receipt =====
+  /* ====== NEW: Payslip – India IT ====== */
   {
-    id: "bill-simple",
-    name: "Bill / Receipt – Simple",
+    id: "payslip-india-it",
+    name: "Payslip – India IT (A4)",
     zones: [
-      { id: "bill-hdr", type: "text", x: 50, y: 30, width: 300, height: 36, content: "BILL / RECEIPT", isDynamic: false, styles: { fontSize: 18, fontWeight: "bold", border: "1px solid #ccc", backgroundColor: "transparent", color: "#000" } },
-      { id: "bill-seller", type: "text", x: 50, y: 70, width: 300, height: 44, content: "{{SellerName}}\n{{SellerAddress}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "bill-meta", type: "text", x: 380, y: 70, width: 180, height: 44, content: "Bill No: {{BillNo}}\nDate: {{BillDate}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "bill-cust", type: "text", x: 50, y: 130, width: 510, height: 50, content: "Customer: {{CustomerName}} | Phone: {{CustomerPhone}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      // Items
-      { id: "bill-items", type: "table", x: 50, y: 190, width: 510, height: 260, content: "columns=Item|Qty|Rate|Amount; data={{LineItems}}", isDynamic: true, styles: { border: "1px solid #333", backgroundColor: "transparent" } },
-      // Totals
-      { id: "bill-sub", type: "text", x: 360, y: 460, width: 200, height: 18, content: "Subtotal: {{SubTotal}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "bill-tax", type: "text", x: 360, y: 478, width: 200, height: 18, content: "Tax: {{Tax}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "bill-round", type: "text", x: 360, y: 496, width: 200, height: 18, content: "Round Off: {{RoundOff}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "bill-total", type: "text", x: 360, y: 514, width: 200, height: 22, content: "Total: {{GrandTotal}}", isDynamic: true, styles: { fontSize: 14, fontWeight: "bold", border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "bill-footer", type: "text", x: 50, y: 550, width: 510, height: 50, content: "Thank you for your business!", isDynamic: false, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent", color: "#000" } },
-    ],
-  },
+      // header band
+      {
+        id: "ps-hdr",
+        type: "rect",
+        x: 40,
+        y: 30,
+        width: 515,
+        height: 110,
+        content: "",
+        isDynamic: false,
+        styles: { backgroundColor: "transparent", border: "1px solid #999" },
+      },
+      // logo
+      {
+        id: "ps-logo",
+        type: "image",
+        x: 52, y: 44, width: 80, height: 80,
+        content: "logo-placeholder.png",
+        isDynamic: true,
+        variableName: "companyLogo",
+        styles: { border: "1px solid #ccc", backgroundColor: "transparent" },
+      },
+      // company + title
+      {
+        id: "ps-company",
+        type: "text",
+        x: 140,
+        y: 48,
+        width: 420,
+        height: 36,
+        content: "{{CompanyName}}",
+        isDynamic: false,
+        styles: { fontSize: 20, fontWeight: "bold", color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
+      {
+        id: "ps-company-addr",
+        type: "text",
+        x: 140,
+        y: 82,
+        width: 420,
+        height: 40,
+        content: "{{CompanyAddress}}",
+        isDynamic: false,
+        styles: { fontSize: 12, color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
+      {
+        id: "ps-title",
+        type: "text",
+        x: 590,
+        y: 48,
+        width: 150,
+        height: 72,
+        content: "Payslip\n{{PayMonth}} {{PayYear}}",
+        isDynamic: false,
+        styles: { fontSize: 12, fontWeight: "bold", color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
 
-  // ===== New: Payslip (India – IT company style) =====
-  {
-    id: "payslip-india-standard",
-    name: "Payslip – India (IT Standard)",
-    zones: [
-      // Header with company info
-      { id: "ps-hdr-rect", type: "rect", x: 40, y: 20, width: 520, height: 110, content: "", isDynamic: false, styles: { border: "1px solid #999", backgroundColor: "transparent" } },
-      { id: "ps-company", type: "text", x: 50, y: 30, width: 400, height: 24, content: "{{CompanyName}}", isDynamic: true, styles: { fontSize: 16, fontWeight: "bold", border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-comp-addr", type: "text", x: 50, y: 56, width: 400, height: 44, content: "{{CompanyAddress}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-period", type: "text", x: 380, y: 30, width: 170, height: 44, content: "Payslip\n{{PayMonth}} {{PayYear}}", isDynamic: true, styles: { fontSize: 12, fontWeight: "bold", border: "1px solid #ccc", backgroundColor: "transparent" } },
+      // employee details
+      {
+        id: "ps-emp-rect",
+        type: "rect",
+        x: 40,
+        y: 150,
+        width: 515,
+        height: 110,
+        content: "",
+        isDynamic: false,
+        styles: { backgroundColor: "transparent", border: "1px solid #999" },
+      },
+      {
+        id: "ps-emp-lines",
+        type: "text",
+        x: 50,
+        y: 160,
+        width: 515,
+        height: 90,
+        content:
+          "Employee: {{EmployeeName}}  |  Emp ID: {{EmployeeId}}  |  Dept: {{Department}}  |  Desig: {{Designation}}\n" +
+          "PAN: {{PAN}}  |  UAN: {{UAN}}  |  PF No: {{PFNo}}  |  ESI No: {{ESINo}}\n" +
+          "Bank: {{BankName}}  |  A/C: {{BankAccount}}  |  IFSC: {{IFSC}}\n" +
+          "Work Days: {{DaysWorked}} / {{DaysInMonth}}  |  LOP: {{LOP}}",
+        isDynamic: false,
+        styles: { fontSize: 12, color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
 
-      // Employee details block
-      { id: "ps-emp-rect", type: "rect", x: 40, y: 140, width: 520, height: 120, content: "", isDynamic: false, styles: { border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-emp-1", type: "text", x: 50, y: 150, width: 500, height: 18, content: "Employee: {{EmpName}}  |  Emp ID: {{EmpCode}}  |  Dept: {{Department}}  |  Desig: {{Designation}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-emp-2", type: "text", x: 50, y: 170, width: 500, height: 18, content: "PAN: {{PAN}}  |  UAN: {{UAN}}  |  PF No: {{PFNo}}  |  ESI No: {{ESINo}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-emp-3", type: "text", x: 50, y: 190, width: 500, height: 18, content: "Bank: {{BankName}}  |  A/C: {{BankAccount}}  |  IFSC: {{IFSC}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-emp-4", type: "text", x: 50, y: 210, width: 500, height: 18, content: "Work Days: {{PaidDays}} / {{CalendarDays}}  |  LOP: {{LOPDays}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
+      // section headings
+      {
+        id: "ps-earnings-h",
+        type: "text",
+        x: 50,
+        y: 276,
+        width: 320,
+        height: 24,
+        content: "EARNINGS",
+        isDynamic: false,
+        styles: { fontSize: 14, fontWeight: "bold", color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
+      {
+        id: "ps-deductions-h",
+        type: "text",
+        x: 424,
+        y: 276,
+        width: 320,
+        height: 24,
+        content: "DEDUCTIONS",
+        isDynamic: false,
+        styles: { fontSize: 14, fontWeight: "bold", color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
 
-      // Earnings and Deductions side-by-side tables
-      { id: "ps-earn-title", type: "text", x: 50, y: 270, width: 250, height: 18, content: "EARNINGS", isDynamic: false, styles: { fontSize: 12, fontWeight: "bold", border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-ded-title", type: "text", x: 330, y: 270, width: 230, height: 18, content: "DEDUCTIONS", isDynamic: false, styles: { fontSize: 12, fontWeight: "bold", border: "1px solid #ccc", backgroundColor: "transparent" } },
+      // earnings table (now bound to earningsTable)
+      {
+        id: "ps-earnings",
+        type: "table",
+        x: 44, y: 304, width: 330, height: 260,
+        content: "",               // <— no JSON string anymore
+        isDynamic: true,
+        variableName: "earningsTable", // matches helpers.ts
+        styles: { backgroundColor: "transparent", border: "1px solid #999" },
+      },
+      {
+        id: "ps-deductions",
+        type: "table",
+        x: 410, y: 304, width: 330, height: 260,
+        content: "",
+        isDynamic: true,
+        variableName: "deductionsTable",
+        styles: { backgroundColor: "transparent", border: "1px solid #999" },
+      },
+      // totals block
+      {
+        id: "ps-totals-rect",
+        type: "rect",
+        x: 40,
+        y: 584,
+        width: 515,
+        height: 90,
+        content: "",
+        isDynamic: false,
+        styles: { backgroundColor: "transparent", border: "1px solid #999" },
+      },
+      {
+        id: "ps-gross-vs-ded",
+        type: "text",
+        x: 50,
+        y: 598,
+        width: 515,
+        height: 24,
+        content: "Gross Earnings: {{GrossEarnings}}    Total Deductions: {{TotalDeductions}}",
+        isDynamic: false,
+        styles: { fontSize: 12, fontWeight: "bold", color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
+      {
+        id: "ps-net",
+        type: "text",
+        x: 50,
+        y: 624,
+        width: 515,
+        height: 26,
+        content: "NET PAY: {{NetPay}}",
+        isDynamic: false,
+        styles: { fontSize: 16, fontWeight: "bold", color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
+      {
+        id: "ps-words",
+        type: "text",
+        x: 50,
+        y: 652,
+        width: 515,
+        height: 40,
+        content: "(Rupees {{NetPayInWords}} Only)",
+        isDynamic: false,
+        styles: { fontSize: 12, color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
 
-      // Table content note: supply rows via {{Earnings}} and {{Deductions}} collections
-      { id: "ps-earnings", type: "table", x: 40, y: 290, width: 270, height: 240, content: "columns=Component|Amount; data={{Earnings}}", isDynamic: true, styles: { border: "1px solid #333", backgroundColor: "transparent" } },
-      { id: "ps-deductions", type: "table", x: 330, y: 290, width: 230, height: 240, content: "columns=Component|Amount; data={{Deductions}}", isDynamic: true, styles: { border: "1px solid #333", backgroundColor: "transparent" } },
-
-      // Summary
-      { id: "ps-summary-rect", type: "rect", x: 40, y: 540, width: 520, height: 100, content: "", isDynamic: false, styles: { border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-gross", type: "text", x: 50, y: 550, width: 240, height: 20, content: "Gross Earnings: {{GrossEarnings}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-tot-ded", type: "text", x: 300, y: 550, width: 240, height: 20, content: "Total Deductions: {{TotalDeductions}}", isDynamic: true, styles: { fontSize: 12, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-net", type: "text", x: 50, y: 572, width: 490, height: 24, content: "NET PAY: {{NetPay}}", isDynamic: true, styles: { fontSize: 14, fontWeight: "bold", border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-net-words", type: "text", x: 50, y: 598, width: 490, height: 22, content: "(Rupees {{NetPayInWords}} Only)", isDynamic: true, styles: { fontSize: 12, fontStyle: "italic", border: "1px solid #ccc", backgroundColor: "transparent" } },
-
-      // Footer / signatures
-      { id: "ps-note", type: "text", x: 40, y: 650, width: 360, height: 40, content: "This is a system generated payslip and does not require a signature.", isDynamic: false, styles: { fontSize: 11, border: "1px solid #ccc", backgroundColor: "transparent" } },
-      { id: "ps-sign", type: "text", x: 420, y: 650, width: 140, height: 40, content: "Authorised Signatory", isDynamic: false, styles: { fontSize: 11, textAlign: "right", border: "1px solid #ccc", backgroundColor: "transparent" } },
+      // footer note
+      {
+        id: "ps-footer",
+        type: "text",
+        x: 40,
+        y: 740,
+        width: 515,
+        height: 30,
+        content: "This is a system generated payslip and does not require a signature.",
+        isDynamic: false,
+        styles: { fontSize: 10, color: "#000", backgroundColor: "transparent", border: "1px solid #ccc" },
+      },
     ],
   },
 ];
