@@ -1,4 +1,5 @@
 import { API_BASE } from "../api";
+import { authFetch } from "../auth";
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -207,7 +208,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templ
     }
     try {
       const payload = { name: layoutName.trim(), structure: { zones } };
-      const res = await fetch(`${API_BASE}/layouts`, {
+      const res = await authFetch(`${API_BASE}/layouts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -229,7 +230,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templ
 
   const fetchSavedLayouts = async () => {
     try {
-      const res = await fetch(`${API_BASE}/layouts`);
+      const res = await authFetch(`${API_BASE}/layouts`);
       if (!res.ok) throw new Error("Failed to fetch saved layouts");
       const data = await res.json();
       setSavedLayouts(Array.isArray(data) ? data : []);

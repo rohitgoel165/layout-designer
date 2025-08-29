@@ -17,16 +17,20 @@ try {
   }
 }
 
-const sendEmailHandler = mod?.sendEmailHandler || mod?.default?.sendEmailHandler;
+const sendEmailHandler =
+  mod?.sendEmailHandler || mod?.default?.sendEmailHandler;
+
 if (typeof sendEmailHandler !== "function") {
   throw new Error(
-    'sendEmailHandler not found in ../controllers/notifyController.{cjs,js}'
+    "sendEmailHandler not found in ../controllers/notifyController.{cjs,js}"
   );
 }
 
 // Async safety wrapper
-const asyncHandler = (fn) => (req, res, next) =>
-  Promise.resolve(fn(req, res, next)).catch(next);
+const asyncHandler =
+  (fn) =>
+  (req, res, next) =>
+    Promise.resolve(fn(req, res, next)).catch(next);
 
 // POST /layout-be/api/notify/email
 router.post("/email", asyncHandler(sendEmailHandler));

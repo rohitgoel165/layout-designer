@@ -4,10 +4,8 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Download, Trash2, RefreshCw, Eye } from "lucide-react";
-import { downloadDataUrl, sendEmail } from "../api";
+import { downloadDataUrl, sendEmail, absoluteUrl } from "../api";
 import { toast } from "sonner";
-
-// ✅ Use shared types instead of redefining
 import type { Job, JobOutput } from "../types";
 
 /* ------------ helpers ------------ */
@@ -18,29 +16,32 @@ const fmt = (d?: Date | string) => {
   return dt.toLocaleString();
 };
 
+const isHttp = (u?: string) => !!u && /^https?:\/\//i.test(u);
+const isDataImg = (u?: string) => !!u && /^data:image/i.test(u);
+const looksPdf = (t?: string, u?: string) => {
+  const tt = (t || "").toLowerCase();
+  if (tt === "pdf" || tt === "application/pdf") return true;
+  return !!u && /\.pdf(\?|$)/i.test(u || "");
+};
+const looksZip = (t?: string, u?: string) => {
+  const tt = (t || "").toLowerCase();
+  if (tt === "zip" || tt === "application/zip" || tt === "pdf-zip") return true;
+  return !!u && /\.zip(\?|$)/i.test(u || "");
+};
+
+// Prefer sending absolute URLs to backend so it fetches binary content server-side.
+// This avoids huge JSON payloads and base64 truncation/corruption.
+
 function StatusBadge({ status }: { status?: string }) {
   const s = (status || "").toLowerCase();
 
   if (s === "completed" || s === "success") {
-    return (
-      <Badge className="border bg-green-100 text-green-700 border-green-200">
-        {status}
-      </Badge>
-    );
+    return <Badge className="border bg-green-100 text-green-700 border-green-200">{status}</Badge>;
   }
   if (s === "failed") {
-    return (
-      <Badge className="border bg-red-100 text-red-700 border-red-200">
-        {status}
-      </Badge>
-    );
+    return <Badge className="border bg-red-100 text-red-700 border-red-200">{status}</Badge>;
   }
-  // processing / running / pending / anything else
-  return (
-    <Badge className="border bg-amber-100 text-amber-700 border-amber-200">
-      {status}
-    </Badge>
-  );
+  return <Badge className="border bg-amber-100 text-amber-700 border-amber-200">{status}</Badge>;
 }
 
 export function JobsDashboard({
@@ -55,6 +56,8 @@ export function JobsDashboard({
   onDownloadResult: (id: string) => void;
 }) {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [page, setPage] = useState<number>(1);
+  const pageSize = 10;
 
   // Email UI state
   const [emailTo, setEmailTo] = useState<string>("");
@@ -86,15 +89,22 @@ export function JobsDashboard({
     return { total, completed, failed, inProgress, successRate, last };
   }, [jobs, sortedJobs]);
 
+  // Pagination
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(sortedJobs.length / pageSize)), [sortedJobs.length]);
+  const pageItems = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sortedJobs.slice(start, start + pageSize);
+  }, [sortedJobs, page]);
+  const canPrev = page > 1;
+  const canNext = page < totalPages;
+
   /* ------------ email helpers ------------ */
 
   const openDetails = (job: Job) => {
     setSelectedJob(job);
     setEmailSubject(`Your job ${job.layoutName || job.id} outputs`);
     setEmailMessage(
-      `Hello,\n\nPlease find the generated outputs attached for job: ${
-        job.layoutName || job.id
-      }.\n\nThanks!`
+      `Hello,\n\nPlease find the generated outputs attached for job: ${job.layoutName || job.id}.\n\nThanks!`
     );
   };
 
@@ -108,16 +118,14 @@ export function JobsDashboard({
 
   const renderOutput = (out: JobOutput, idx: number) => {
     const url = out?.url || (typeof out?.data === "string" ? out.data : undefined);
-
-    const isDataImage = typeof url === "string" && url.startsWith("data:image");
-    const isHttpUrl =
-      typeof url === "string" &&
-      (url.startsWith("http://") || url.startsWith("https://"));
+    const isDataImage = isDataImg(url);
+    const isHttpUrl = isHttp(url);
+    const displayType = (out?.type as string) || (looksPdf(out?.type, url) ? "pdf" : (looksZip(out?.type, url) ? "zip" : ""));
 
     return (
       <div key={idx} className="p-2 border rounded space-y-2">
         <div className="flex items-center justify-between">
-          <div className="text-xs font-medium">{out.type || "output"}</div>
+          <div className="text-xs font-medium">{displayType || "output"}</div>
           <div className="text-[10px] text-muted-foreground">{idx + 1}</div>
         </div>
 
@@ -130,19 +138,13 @@ export function JobsDashboard({
             </a>
           </div>
         ) : url ? (
-          <pre className="text-[11px] truncate max-w-full">
-            {String(url).slice(0, 200)}
-          </pre>
+          <pre className="text-[11px] truncate max-w-full">{String(url).slice(0, 200)}</pre>
         ) : (
-          <div className="text-[11px] text-muted-foreground">
-            No URL/data available
-          </div>
+          <div className="text-[11px] text-muted-foreground">No URL/data available</div>
         )}
 
         <div className="flex items-center justify-between">
-          <div className="text-[11px] text-muted-foreground">
-            type: {out.type || "-"}
-          </div>
+          <div className="text-[11px] text-muted-foreground">type: {displayType || "-"}</div>
 
           <div className="space-x-2">
             {isDataImage && typeof url === "string" && (
@@ -180,22 +182,62 @@ export function JobsDashboard({
     );
   };
 
-  // Get image-data outputs ready for email attachments
-  const dataImageAttachments = useMemo(() => {
-    if (!selectedJob?.responseData?.outputs) return [];
-    return selectedJob.responseData.outputs
-      .map((out, idx) => {
-        const url = out?.url || (typeof out?.data === "string" ? out.data : undefined);
-        if (typeof url === "string" && url.startsWith("data:image")) {
-          return {
-            filename: `${selectedJob.id}-output-${idx + 1}.png`,
-            content: url,
-          };
-        }
-        return null;
-      })
-      .filter(Boolean) as Array<{ filename: string; content: string }>;
+  // Attachment plan (counts only; the real fetch happens on send)
+  const attachmentPlan = useMemo(() => {
+    if (!selectedJob?.responseData?.outputs) return { imgs: 0, pdfs: 0, zips: 0 };
+    let imgs = 0,
+      pdfs = 0,
+      zips = 0;
+    for (const out of selectedJob.responseData.outputs) {
+      const url = out?.url || (typeof out?.data === "string" ? out.data : undefined);
+      const t = out?.type;
+      if (isDataImg(url)) imgs++;
+      else if (looksPdf(t, url) && (isHttp(url) || isDataImg(url))) pdfs++;
+      else if (looksZip(t, url) && isHttp(url)) zips++;
+    }
+    return { imgs, pdfs, zips };
   }, [selectedJob]);
+
+  async function buildEmailAttachments(job: Job) {
+    const atts: Array<{ filename: string; content: string }> = [];
+    const outputs = job?.responseData?.outputs || [];
+
+    let pdfCounter = 0;
+    let imgCounter = 0;
+    let zipCounter = 0;
+
+    for (let i = 0; i < outputs.length; i++) {
+      const out = outputs[i];
+      const url = out?.url || (typeof out?.data === "string" ? out.data : undefined);
+      const type = (out?.type || "").toLowerCase();
+
+      if (!url) continue;
+
+      // Data image (e.g., QR)
+      if (isDataImg(url)) {
+        atts.push({
+          filename: `${job.id}-image-${++imgCounter}.png`,
+          content: url,
+        });
+        continue;
+      }
+
+      // PDFs / ZIPs: send absolute URL; backend will fetch binary content.
+      // Ensure URL is absolute (http/https). If relative (/tmp/..), make absolute via API origin.
+      const abs = isHttp(url) ? url : absoluteUrl(url) || undefined;
+      if (!abs) continue;
+      if (looksPdf(type, abs)) {
+        atts.push({ filename: `${job.id}-doc-${++pdfCounter}.pdf`, content: abs });
+        continue;
+      }
+      if (looksZip(type, abs)) {
+        atts.push({ filename: `${job.id}-outputs-${++zipCounter}.zip`, content: abs });
+        continue;
+      }
+    }
+
+    return atts;
+  }
 
   const handleSendEmail = async () => {
     if (!selectedJob) return;
@@ -203,21 +245,24 @@ export function JobsDashboard({
       toast.error("Please enter a recipient email.");
       return;
     }
-    if (dataImageAttachments.length === 0) {
-      toast.error("No image outputs available to attach.");
-      return;
-    }
 
     setIsSendingEmail(true);
     try {
+      const attachments = await buildEmailAttachments(selectedJob);
+      if (attachments.length === 0) {
+        toast.error("No outputs available to attach (images/PDFs/ZIPs).");
+        setIsSendingEmail(false);
+        return;
+      }
+
       await sendEmail({
         to: emailTo,
         subject: emailSubject || `Job ${selectedJob.id} outputs`,
         text: emailMessage || "See attached outputs.",
-        attachments: dataImageAttachments,
+        attachments,
       });
 
-      toast.success("Email sent successfully.");
+      toast.success(`Email sent with ${attachments.length} attachment(s).`);
     } catch (err: any) {
       toast.error(`Failed to send email: ${err?.message || String(err)}`);
     } finally {
@@ -293,15 +338,16 @@ export function JobsDashboard({
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedJobs.map((job) => {
+                  {pageItems.map((job) => {
                     const statusNorm = (job.status || "").toLowerCase();
+                    const displayName = String(job.layoutName || job.workflowId || "").replace(/[\uFFFD\u2013\u2014]/g, "-");
                     const isFailed = statusNorm === "failed";
                     return (
                       <tr key={job.id} className="border-t hover:bg-muted/30">
                         <td className="p-3 w-36 truncate font-mono">{job.id}</td>
                         <td className="p-3">
                           <div className="font-medium truncate">
-                            {job.layoutName || job.workflowId || "-"}
+                            {displayName || "-"}
                           </div>
                           <div className="text-[11px] text-muted-foreground truncate">
                             {job.type}
@@ -355,6 +401,19 @@ export function JobsDashboard({
                   })}
                 </tbody>
               </table>
+              <div className="flex items-center justify-between p-3 border-t text-xs">
+                <div>
+                  Page {page} of {totalPages} • {sortedJobs.length} jobs
+                </div>
+                <div className="space-x-2">
+                  <Button size="sm" variant="outline" disabled={!canPrev} onClick={() => canPrev && setPage((p) => p - 1)}>
+                    Prev
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={!canNext} onClick={() => canNext && setPage((p) => p + 1)}>
+                    Next
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
@@ -389,18 +448,10 @@ export function JobsDashboard({
               <div>
                 <h4 className="font-medium mb-2 text-sm">Status & Info</h4>
                 <div className="text-xs space-y-1">
-                  <div>
-                    <strong>Status:</strong> {selectedJob.status}
-                  </div>
-                  <div>
-                    <strong>Progress:</strong> {selectedJob.progress}%
-                  </div>
-                  <div>
-                    <strong>Created:</strong> {fmt(selectedJob.createdAt)}
-                  </div>
-                  <div>
-                    <strong>Completed:</strong> {fmt(selectedJob.completedAt)}
-                  </div>
+                  <div><strong>Status:</strong> {selectedJob.status}</div>
+                  <div><strong>Progress:</strong> {selectedJob.progress}%</div>
+                  <div><strong>Created:</strong> {fmt(selectedJob.createdAt)}</div>
+                  <div><strong>Completed:</strong> {fmt(selectedJob.completedAt)}</div>
                   {selectedJob.errorMessage && (
                     <div className="mt-2 text-red-600">
                       <strong>Error:</strong> {selectedJob.errorMessage}
@@ -422,23 +473,20 @@ export function JobsDashboard({
                 {Array.isArray(selectedJob.responseData?.outputs) &&
                 selectedJob.responseData!.outputs!.length > 0 ? (
                   <div className="space-y-2">
-                    {selectedJob.responseData!.outputs!.map((out, i) =>
-                      renderOutput(out, i)
-                    )}
+                    {selectedJob.responseData!.outputs!.map((out, i) => renderOutput(out, i))}
                   </div>
                 ) : (
-                  <div className="text-[11px] text-muted-foreground">
-                    No outputs available for this job.
-                  </div>
+                  <div className="text-[11px] text-muted-foreground">No outputs available for this job.</div>
                 )}
 
                 {/* Send via Email */}
                 <div className="mt-5 pt-4 border-t">
                   <h4 className="font-medium mb-2 text-sm">Send via Email</h4>
                   <div className="text-[11px] text-muted-foreground mb-2">
-                    {dataImageAttachments.length > 0
-                      ? `Found ${dataImageAttachments.length} image attachment(s) (e.g., QR codes).`
-                      : "No image outputs available to attach."}
+                    {attachmentPlan.imgs + attachmentPlan.pdfs + attachmentPlan.zips > 0
+                      ? `Will attach ${attachmentPlan.imgs + attachmentPlan.pdfs + attachmentPlan.zips} file(s): ` +
+                        `${attachmentPlan.imgs} image(s), ${attachmentPlan.pdfs} PDF(s), ${attachmentPlan.zips} ZIP(s).`
+                      : "No outputs available to attach."}
                   </div>
 
                   <div className="space-y-2">
@@ -464,12 +512,7 @@ export function JobsDashboard({
                       onChange={(e) => setEmailMessage(e.target.value)}
                     />
                     <div className="flex justify-end">
-                      <Button
-                        size="sm"
-                        className="h-8 px-3"
-                        onClick={handleSendEmail}
-                        disabled={isSendingEmail}
-                      >
+                      <Button size="sm" className="h-8 px-3" onClick={handleSendEmail} disabled={isSendingEmail}>
                         {isSendingEmail ? "Sending..." : "Send Email"}
                       </Button>
                     </div>
@@ -481,11 +524,7 @@ export function JobsDashboard({
             <div className="mt-6 flex justify-end gap-2">
               {selectedJob.responseData?.outputs &&
                 selectedJob.responseData.outputs.length > 0 && (
-                  <Button
-                    size="sm"
-                    className="h-8 px-3"
-                    onClick={() => onDownloadResult(selectedJob.id)}
-                  >
+                  <Button size="sm" className="h-8 px-3" onClick={() => onDownloadResult(selectedJob.id)}>
                     <Download className="w-4 h-4 mr-2" />
                     Download Result
                   </Button>
@@ -514,3 +553,7 @@ export function JobsDashboard({
 }
 
 export default JobsDashboard;
+
+
+
+

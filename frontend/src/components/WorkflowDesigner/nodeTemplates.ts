@@ -1,5 +1,5 @@
 // src/components/WorkflowDesigner/nodeTemplates.ts
-import { FileText, Globe, Square, Zap, Smartphone, Database, QrCode } from "lucide-react";
+import { FileText, Globe, Square, Zap, QrCode } from "lucide-react";
 
 export const NODE_TEMPLATES = {
   input: [
@@ -9,7 +9,14 @@ export const NODE_TEMPLATES = {
       icon: FileText,
       inputs: [],
       outputs: [{ id: "data", label: "Data", type: "tabular" }],
-      config: { filePath: "", sheetName: "Payslip,Earnings,Deductions", hasHeaders: true, __file: null, __fileDataUrl: null, __rows: null },
+      config: {
+        filePath: "",
+        sheetName: "Payslip,Earnings,Deductions",
+        hasHeaders: true,
+        __file: null,
+        __fileDataUrl: null,
+        __rows: null,
+      },
     },
     {
       subtype: "csv",
@@ -43,7 +50,15 @@ export const NODE_TEMPLATES = {
       icon: Square,
       inputs: [{ id: "data", label: "Data", type: "any" }],
       outputs: [{ id: "processed", label: "Processed", type: "document" }],
-      config: { templateId: "", variableMapping: {}, companyLogoDataUrl: "", companyLogoUrl: "" },
+      // NEW: defaults for output formats and delivery mode
+      config: {
+        templateId: "",
+        variableMapping: {},
+        companyLogoDataUrl: "",
+        companyLogoUrl: "",
+        outputFormats: ["pdf"], // ← only PDF & QR allowed overall
+        deliveryMode: "api",    // ← ftp | api | email
+      },
     },
     {
       subtype: "transform",
@@ -55,6 +70,7 @@ export const NODE_TEMPLATES = {
     },
   ],
   output: [
+    // Keep ONLY these two:
     {
       subtype: "pdf",
       label: "PDF Output",
@@ -64,36 +80,12 @@ export const NODE_TEMPLATES = {
       config: { filename: "output.pdf", quality: "high" },
     },
     {
-      subtype: "html",
-      label: "HTML Output",
-      icon: Globe,
-      inputs: [{ id: "data", label: "Data", type: "document" }],
-      outputs: [],
-      config: { filename: "output.html", responsive: true },
-    },
-    {
       subtype: "qrcode",
       label: "QR Code",
       icon: QrCode,
       inputs: [{ id: "data", label: "Data", type: "any" }],
       outputs: [],
       config: { size: 256, errorCorrection: "M" },
-    },
-    {
-      subtype: "mobile",
-      label: "Mobile App",
-      icon: Smartphone,
-      inputs: [{ id: "data", label: "Data", type: "document" }],
-      outputs: [],
-      config: { platform: "both", bundleId: "", appName: "" },
-    },
-    {
-      subtype: "headless",
-      label: "Headless API",
-      icon: Database,
-      inputs: [{ id: "data", label: "Data", type: "any" }],
-      outputs: [],
-      config: { endpoint: "", format: "json", authentication: {} },
     },
   ],
 } as const;

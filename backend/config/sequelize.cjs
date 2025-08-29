@@ -13,17 +13,27 @@ try {
 
 const common = {
   dialect: 'postgres',
-  host: process.env.POSTGRES_HOST || 'postgres',
-  port: Number(process.env.POSTGRES_PORT || 5432),
-  database: process.env.POSTGRES_DB || 'layoutdb',
-  username: process.env.POSTGRES_USER || 'layout',
-  password: process.env.POSTGRES_PASSWORD || 'layoutpass',
   logging: false,
   define: { freezeTableName: true, timestamps: true },
 };
 
+// Prefer single DATABASE_URL when present (avoids drift across envs)
+const usingUrl = !!process.env.DATABASE_URL;
+// NOTE: sequelize-cli expects snake_case key: use_env_variable
+const fromUrl = usingUrl ? { ...common, use_env_variable: 'DATABASE_URL' } : null;
+const fromParts = usingUrl
+  ? null
+  : {
+      ...common,
+      host: process.env.POSTGRES_HOST || 'postgres',
+      port: Number(process.env.POSTGRES_PORT || 5432),
+      database: process.env.POSTGRES_DB || 'layoutdb',
+      username: process.env.POSTGRES_USER || 'layout',
+      password: process.env.POSTGRES_PASSWORD || 'layoutpass',
+    };
+
 module.exports = {
-  development: common,
-  test: common,
-  production: common,
+  development: usingUrl ? fromUrl : fromParts,
+  test: usingUrl ? fromUrl : fromParts,
+  production: usingUrl ? fromUrl : fromParts,
 };
