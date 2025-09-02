@@ -10,11 +10,6 @@ import {
   LABEL_SM,
   BTN_COMPACT,
   WorkflowNode,
-  // NEW:
-  OutputFormat,
-  DeliveryMode,
-  DEFAULT_OUTPUT_FORMATS,
-  DEFAULT_DELIVERY_MODE,
 } from "./types";
 import { LayoutZone } from "../LayoutDesigner";
 
@@ -132,6 +127,7 @@ export default function NodePropertiesPanel({
                 placeholder="https://example.com/logo.png"
               />
             </div>
+            {/* Delivery settings moved to workflow-level panel */}
           </div>
         );
 

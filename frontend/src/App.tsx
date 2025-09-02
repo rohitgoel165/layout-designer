@@ -7,6 +7,12 @@ import { toast } from "sonner";
 import LayoutDesigner from "./components/LayoutDesigner";
 import type { LayoutZone } from "./components/LayoutDesigner";
 import PRESET_TEMPLATES from "./templates/presets";
+// Normalize template names to avoid odd dash glyphs showing as replacement chars
+const normalizeName = (s: string) =>
+  String(s)
+    .normalize("NFKC")
+    // replace dash-like unicode with a plain hyphen
+    .replace(/[\u2012-\u2015\u2212]/g, "-");
 
 // ✅ Import only the component here
 import JobsDashboard from "./components/JobsDashboard";

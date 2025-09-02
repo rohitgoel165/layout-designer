@@ -5,7 +5,7 @@ import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { Textarea } from "../ui/textarea";
+// removed description editor: Textarea not needed here
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
 import { Play, RotateCcw, Plus, Download } from "lucide-react";
 
@@ -22,6 +22,8 @@ import {
   zipDownloadUrl,
   sendEmail,
   downloadDataUrl,
+  deliverToApi,
+  deliverToFtp,
   renderLayoutPdf,
   renderLayoutPdfBatch,
 } from "../../api";
@@ -348,6 +350,9 @@ export function WorkflowDesigner({
       tags: wf.tags,
       outputFormats,
       deliveryMode,
+      // include top-level delivery settings for backend persistence
+      apiDelivery: (wf as any).apiDelivery,
+      ftpDelivery: (wf as any).ftpDelivery,
     } as any;
   };
 
@@ -380,6 +385,8 @@ export function WorkflowDesigner({
       tags: (rec as any).tags ?? base.tags,
       outputFormats: (rec as any).outputFormats ?? base.outputFormats,
       deliveryMode: (rec as any).deliveryMode ?? base.deliveryMode,
+      apiDelivery: (rec as any).apiDelivery ?? (base as any).apiDelivery,
+      ftpDelivery: (rec as any).ftpDelivery ?? (base as any).ftpDelivery,
     };
 
     return wf;
@@ -428,6 +435,8 @@ export function WorkflowDesigner({
       tags: [],
       outputFormats: DEFAULT_OUTPUT_FORMATS,
       deliveryMode: DEFAULT_DELIVERY_MODE,
+      apiDelivery: { endpoint: "", method: "POST", headers: {} , mode: 'links' },
+      ftpDelivery: { host: "", port: 21, user: "", password: "", remoteDir: "/", secure: false },
     });
     setSelectedNode(null);
   };
@@ -626,7 +635,46 @@ export function WorkflowDesigner({
           console.warn("recordWorkflowExecution failed:", e);
         }
 
-        // Auto-email when delivery = email (Step 5 end-to-end)
+        // Auto-deliver for API/FTP modes
+        try {
+          if (deliveryMode === "api") {
+            const apiCfg = (wf as any).apiDelivery || {};
+            const apiUrl = apiCfg.endpoint || (templateNode as any)?.config?.deliveryApiUrl || "";
+            const apiMethod = apiCfg.method || (templateNode as any)?.config?.deliveryApiMethod || 'POST';
+            const apiHeaders = apiCfg.headers || (templateNode as any)?.config?.deliveryApiHeaders || {};
+            if (apiUrl) {
+              await deliverToApi({
+                endpoint: apiUrl,
+                method: apiMethod,
+                headers: apiHeaders as any,
+                data: { workflowId: wf.id, workflowName: wf.name },
+                outputs: combinedOutputs.map(o => ({ url: o.url, filename: undefined })),
+                mode: (apiCfg.mode as any) || 'links',
+              });
+            }
+          } else if (deliveryMode === "ftp") {
+            const ftpCfg = (wf as any).ftpDelivery || {};
+            const ftpHost = ftpCfg.host || '';
+            const ftpUser = ftpCfg.user || '';
+            const ftpPassword = ftpCfg.password || '';
+            const ftpPort = Number(ftpCfg.port ?? 21);
+            const ftpSecure = Boolean(ftpCfg.secure ?? false);
+            const ftpDir = ftpCfg.remoteDir || '/';
+            if (ftpHost) {
+              await deliverToFtp({
+                host: ftpHost,
+                user: ftpUser,
+                password: ftpPassword,
+                port: ftpPort,
+                secure: ftpSecure,
+                remoteDir: ftpDir,
+                files: combinedOutputs.map(o => ({ url: o.url })),
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('Auto-delivery failed:', e);
+        }        // Auto-email when delivery = email (Step 5 end-to-end)
         const templateEmail =
           (templateNode as any)?.config?.emailTo ||
           (templateNode as any)?.config?.customerEmail ||
@@ -981,17 +1029,6 @@ export function WorkflowDesigner({
           {nameError ? <div className="text-[11px] text-red-600 mt-1">{nameError}</div> : null}
 
           <div className="mt-3">
-            <Label className={LABEL_SM}>Description</Label>
-            <Textarea
-              className="text-[12px] mt-1"
-              value={currentWorkflow.description}
-              onChange={(e) => setCurrentWorkflow((p) => ({ ...p, description: e.target.value, updatedAt: new Date() }))}
-              placeholder="Describe your workflow..."
-              rows={3}
-            />
-          </div>
-
-          <div className="mt-3">
             <Label className={LABEL_SM}>Delivery mode</Label>
             <Select
               value={(currentWorkflow as any).deliveryMode || 'api'}
@@ -1007,6 +1044,54 @@ export function WorkflowDesigner({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Delivery Settings (top-level) */}
+          {((currentWorkflow as any).deliveryMode === 'api') && (
+            <div className="mt-3 space-y-2">
+              <Label className={LABEL_SM}>API Delivery</Label>
+              <Input
+                className="h-8 text-[12px]"
+                placeholder="https://example.com/webhook"
+                value={(currentWorkflow as any).apiDelivery?.endpoint || ''}
+                onChange={(e) => setCurrentWorkflow((p:any)=>({ ...p, apiDelivery: { ...(p.apiDelivery||{}), endpoint: e.target.value }, updatedAt: new Date() }))}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  className="h-8 text-[12px]"
+                  placeholder="POST"
+                  value={(currentWorkflow as any).apiDelivery?.method || 'POST'}
+                  onChange={(e) => setCurrentWorkflow((p:any)=>({ ...p, apiDelivery: { ...(p.apiDelivery||{}), method: e.target.value }, updatedAt: new Date() }))}
+                />
+                <Input
+                  className="h-8 text-[12px]"
+                  placeholder='{"Authorization":"Bearer ..."}'
+                  value={typeof (currentWorkflow as any).apiDelivery?.headers === 'string' ? (currentWorkflow as any).apiDelivery?.headers : JSON.stringify((currentWorkflow as any).apiDelivery?.headers || {})}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    let headers:any = v;
+                    try { headers = JSON.parse(v); } catch {}
+                    setCurrentWorkflow((p:any)=>({ ...p, apiDelivery: { ...(p.apiDelivery||{}), headers }, updatedAt: new Date() }));
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {((currentWorkflow as any).deliveryMode === 'ftp') && (
+            <div className="mt-3 space-y-2">
+              <Label className={LABEL_SM}>FTP Delivery</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input className="h-8 text-[12px]" placeholder="host" value={(currentWorkflow as any).ftpDelivery?.host || ''} onChange={(e)=>setCurrentWorkflow((p:any)=>({ ...p, ftpDelivery: { ...(p.ftpDelivery||{}), host: e.target.value }, updatedAt: new Date() }))} />
+                <Input className="h-8 text-[12px]" placeholder="21" value={String((currentWorkflow as any).ftpDelivery?.port ?? 21)} onChange={(e)=>setCurrentWorkflow((p:any)=>({ ...p, ftpDelivery: { ...(p.ftpDelivery||{}), port: Number(e.target.value||'21') }, updatedAt: new Date() }))} />
+                <Input className="h-8 text-[12px]" placeholder="user" value={(currentWorkflow as any).ftpDelivery?.user || ''} onChange={(e)=>setCurrentWorkflow((p:any)=>({ ...p, ftpDelivery: { ...(p.ftpDelivery||{}), user: e.target.value }, updatedAt: new Date() }))} />
+                <Input className="h-8 text-[12px]" placeholder="password" value={(currentWorkflow as any).ftpDelivery?.password || ''} onChange={(e)=>setCurrentWorkflow((p:any)=>({ ...p, ftpDelivery: { ...(p.ftpDelivery||{}), password: e.target.value }, updatedAt: new Date() }))} />
+                <Input className="h-8 text-[12px]" placeholder="/remote/dir" value={(currentWorkflow as any).ftpDelivery?.remoteDir || '/'} onChange={(e)=>setCurrentWorkflow((p:any)=>({ ...p, ftpDelivery: { ...(p.ftpDelivery||{}), remoteDir: e.target.value }, updatedAt: new Date() }))} />
+                <div className="flex items-center gap-2 text-[12px]">
+                  <input type="checkbox" checked={!!(currentWorkflow as any).ftpDelivery?.secure} onChange={(e)=>setCurrentWorkflow((p:any)=>({ ...p, ftpDelivery: { ...(p.ftpDelivery||{}), secure: e.target.checked }, updatedAt: new Date() }))} /> secure
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* node props */}
@@ -1028,6 +1113,7 @@ export function WorkflowDesigner({
               }))}
             onUpdateNode={(updates) => updateNode(selectedNodeData.id, updates)}
             onDeleteNode={() => deleteNode(selectedNodeData.id)}
+            deliveryMode={(currentWorkflow as any).deliveryMode || DEFAULT_DELIVERY_MODE}
           />
         ) : (
           <div className="text-muted-foreground text-[12px]">Select a node to edit its properties.</div>

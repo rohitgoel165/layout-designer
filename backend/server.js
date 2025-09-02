@@ -109,17 +109,20 @@ const excelRoutes                = await loadRoute("./routes/excelRoutes.js");
 const qrRoutes                   = await loadRoute("./routes/qrRoutes.js");
 const renderRoutes               = await loadRoute("./routes/renderRoutes.js");
 const notifyRoutes               = await loadRoute("./routes/notifyRoutes.js");
+const deliveryRoutes            = await loadRoute("./routes/deliveryRoutes.js");
 const workflowsRoutes            = await loadRoute("./routes/workflows.js");
 const workflowExecutionsRoutes   = await loadRoute("./routes/workflowExecutions.js");
 const yogiRoutes                 = await loadRoute("./routes/yogiRoutes.js");
 
 // Mount under the same base prefix (no duplicate mounts)
 app.use("/api/notify", notifyRoutes);
+app.use("/api/delivery", deliveryRoutes);
 app.use(`${BASE}/layouts`, layoutRoutes);
 app.use(`${BASE}/excel`, excelRoutes);
 app.use(`${BASE}/qr`, qrRoutes);
 app.use(`${BASE}/render`, renderRoutes);
 app.use(`${BASE}/notify`, notifyRoutes);
+app.use(`${BASE}/delivery`, deliveryRoutes);
 app.use(`${BASE}/workflows`, workflowsRoutes);
 app.use(`${BASE}/workflow-executions`, workflowExecutionsRoutes);
 app.use(`${BASE}/yogi`, yogiRoutes);

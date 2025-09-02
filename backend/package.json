@@ -1,34 +1,36 @@
 {
-  "name": "backend",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "db:migrate": "sequelize-cli db:migrate",
-    "db:migrate:undo": "sequelize-cli db:migrate:undo",
-    "db:migrate:status": "sequelize-cli db:migrate:status",
-    "seed": "sequelize-cli db:seed:all"
-  },
-  "dependencies": {
-    "archiver": "^7.0.1",
-    "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^7.8.7",
-    "multer": "^1.4.5-lts.1",
-    "nodemailer": "^7.0.5",
-    "pdfkit": "^0.17.1",
-    "pg": "^8.16.3",
-    "pg-hstore": "^2.3.4",
-    "qrcode": "^1.5.4",
-    "sequelize": "^6.37.7",
-    "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "dotenv": "^17.2.1",
-    "nodemon": "^2.0.22",
-    "sequelize-cli": "^6.6.3"
-  }
+    "name":  "backend",
+    "version":  "1.0.0",
+    "type":  "module",
+    "main":  "server.js",
+    "scripts":  {
+                    "start":  "node server.js",
+                    "dev":  "nodemon server.js",
+                    "db:migrate":  "sequelize-cli db:migrate",
+                    "db:migrate:undo":  "sequelize-cli db:migrate:undo",
+                    "db:migrate:status":  "sequelize-cli db:migrate:status",
+                    "seed":  "sequelize-cli db:seed:all"
+                },
+    "dependencies":  {
+                         "archiver":  "^7.0.1",
+                         "cors":  "^2.8.5",
+                         "express":  "^4.21.2",
+                         "jsonwebtoken":  "^9.0.2",
+                         "mongoose":  "^7.8.7",
+                         "multer":  "^1.4.5-lts.1",
+                         "nodemailer": "^7.0.5",
+    "basic-ftp": "^5.0.3",
+                         "form-data": "^4.0.0",
+                         "pdfkit":  "^0.17.1",
+                         "pg":  "^8.16.3",
+                         "pg-hstore":  "^2.3.4",
+                         "qrcode":  "^1.5.4",
+                         "sequelize":  "^6.37.7",
+                         "xlsx":  "^0.18.5"
+                     },
+    "devDependencies":  {
+                            "dotenv":  "^17.2.1",
+                            "nodemon":  "^2.0.22",
+                            "sequelize-cli":  "^6.6.3"
+                        }
 }

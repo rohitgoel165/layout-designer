@@ -11,7 +11,7 @@ export const PRESETS: Preset[] = [
   /* ====== existing ====== */
   {
     id: "letter-basic",
-    name: "Letter – Greeting",
+    name: "Letter Greeting",
     zones: [
       {
         id: "rect-1",
@@ -48,7 +48,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "invoice-mini",
-    name: "Invoice – Mini",
+    name: "Invoice Mini",
     zones: [
       {
         id: "txt-inv-title",
@@ -136,10 +136,10 @@ export const PRESETS: Preset[] = [
     ],
   },
 
-  /* ======   /* ====== NEW: Invoice – GST ====== */
+  /* ======   /* ====== NEW: Invoice ï¿½ GST ====== */
   {
     id: "invoice-gst-a4",
-    name: "Invoice – GST (A4)",
+    name: "Invoice GST (A4)",
     zones: [
       // header band
       {
@@ -303,10 +303,10 @@ export const PRESETS: Preset[] = [
     ],
   },
 
-  /* ======   /* ====== NEW: Payslip – IT ====== */
+  /* ======   /* ====== NEW: Payslip ï¿½ IT ====== */
   {
     id: "payslip-india-it",
-    name: "Payslip – IT (A4)",
+    name: "Payslip IT (A4)",
     zones: [
       // header band
       {

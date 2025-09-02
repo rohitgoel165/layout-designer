@@ -55,6 +55,22 @@ export interface Workflow {
   outputFormats?: OutputFormat[]; // optional to avoid breaking existing data
   /** NEW: ftp | api | email */
   deliveryMode?: DeliveryMode;    // optional to avoid breaking existing data
+
+  /** Optional top-level delivery settings */
+  apiDelivery?: {
+    endpoint?: string;
+    method?: string;
+    headers?: Record<string, string> | string;
+    mode?: 'links' | 'multipart';
+  };
+  ftpDelivery?: {
+    host?: string;
+    port?: number;
+    user?: string;
+    password?: string;
+    remoteDir?: string;
+    secure?: boolean;
+  };
 }
 
 export interface WorkflowExecution {

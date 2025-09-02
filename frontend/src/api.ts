@@ -422,3 +422,39 @@ export async function recordWorkflowExecution(
   if (!res.ok) throw new Error(`recordWorkflowExecution failed: ${res.status} ${await res.text()}`);
   return res.json();
 }
+
+/* ---------------- DELIVERY ---------------- */
+export async function deliverToApi(payload: {
+  endpoint: string;
+  method?: string;
+  headers?: Record<string,string>;
+  data?: any;
+  outputs?: Array<{ url?: string; file?: string; href?: string; filename?: string; fieldName?: string }>;
+  mode?: 'links' | 'multipart';
+}) {
+  const res = await authFetch(api('/delivery/api'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`deliver api failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+export async function deliverToFtp(payload: {
+  host: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  secure?: boolean;
+  remoteDir?: string;
+  files: Array<{ url?: string; file?: string; href?: string; filename?: string }>;
+}) {
+  const res = await authFetch(api('/delivery/ftp'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`deliver ftp failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}

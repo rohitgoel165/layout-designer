@@ -194,6 +194,18 @@ router.get("/:id", async (req, res) => {
   } catch (e) { res.status(500).json({ error: "Failed to fetch layout" }); }
 });
 
+// DELETE /:id -> delete a layout
+router.delete("/:id", async (req, res) => {
+  try {
+    const row = await Layout.findOne({ where: { id: req.params.id, organizationId: req.orgId } });
+    if (!row) return res.status(404).json({ error: "Not found" });
+    await row.destroy();
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to delete layout" });
+  }
+});
+
 router.post("/:id/render/pdf", async (req, res) => {
   try {
     const row = await Layout.findOne({ where: { id: req.params.id, organizationId: req.orgId } });
