@@ -1,6 +1,6 @@
 // src/api.ts
 
-// ---------- Single dynamic API base 
+// ---------- Single dynamic API base
 declare global {
   interface Window {
     __API_BASE__?: string;
@@ -24,6 +24,27 @@ export const API_BASE = String(fromWindow || fromVite || "/api").replace(
 // Small helper if you want to build endpoints safely
 const api = (p: string) => `${API_BASE}/${p.replace(/^\/+/, "")}`;
 
+// Precompute the origin we’ll use to turn server-returned “/tmp/…pdf|zip”
+// into a fully-qualified URL (important for email attachments).
+const API_ORIGIN = (() => {
+  try {
+    return new URL(API_BASE, window.location.origin).origin;
+  } catch {
+    return window.location.origin;
+  }
+})();
+
+/** Turn "/tmp/xxx.pdf" (or any relative path) into a full URL. */
+export function absoluteUrl(pathOrUrl?: string | null): string | null {
+  if (!pathOrUrl) return null;
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  const p = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
+  return `${API_ORIGIN}${p}`;
+}
+
+// ---- Auth-aware fetch
+import { authFetch } from "./auth";
+
 // ---------------- Types shared in this file ----------------
 
 export type SavedLayout = {
@@ -39,7 +60,7 @@ type Json = any;
 
 /** GET /api/layouts -> returns saved layouts array */
 export async function getLayouts(): Promise<SavedLayout[]> {
-  const res = await fetch(api("/layouts"));
+  const res = await authFetch(api("/layouts"));
   if (!res.ok) {
     const txt = await res.text();
     throw new Error(`Failed to fetch layouts: ${res.status} ${txt}`);
@@ -52,7 +73,7 @@ export async function saveLayout(payload: {
   name: string;
   structure: any;
 }): Promise<Json> {
-  const res = await fetch(api("/layouts"), {
+  const res = await authFetch(api("/layouts"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -75,7 +96,7 @@ export async function uploadExcel(
   form.append("file", file);
   if (sheetName) form.append("sheetName", sheetName);
 
-  const res = await fetch(api("/excel"), {
+  const res = await authFetch(api("/excel"), {
     method: "POST",
     body: form,
   });
@@ -93,7 +114,7 @@ export async function generateQRCode(
   text: string,
   size?: number
 ): Promise<{ dataUrl?: string } & Json> {
-  const res = await fetch(api("/qr"), {
+  const res = await authFetch(api("/qr"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, size }),
@@ -121,7 +142,7 @@ export async function batchGenerateQRCodes(payload: {
   results: Array<{ rowIndex: number; dataUrl: string; textEncoded: string }>;
   zip?: string;
 }> {
-  const res = await fetch(api("/qr/batch"), {
+  const res = await authFetch(api("/qr/batch"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -145,7 +166,7 @@ export async function sendEmail(payload: {
   text?: string;
   attachments?: Array<{ filename: string; content: string }>; // content can be a data URL
 }): Promise<Json> {
-  const res = await fetch(api("/notify/email"), {
+  const res = await authFetch(api("/notify/email"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -176,7 +197,7 @@ export async function renderPdf(payload: {
   data: any;
   filename?: string;
 }): Promise<{ file: string; filename: string }> {
-  const res = await fetch(api("/render/pdf"), {
+  const res = await authFetch(api("/render/pdf"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -194,7 +215,7 @@ export async function renderPdfBatch(payload: {
   files: Array<{ rowIndex: number; filename: string; file: string }>;
   zip: string;
 }> {
-  const res = await fetch(api("/render/batch"), {
+  const res = await authFetch(api("/render/batch"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -211,7 +232,7 @@ export async function renderLayoutPdf(
   data: any,
   filename?: string
 ): Promise<{ file: string }> {
-  const res = await fetch(api(`/layouts/${layoutId}/render/pdf`), {
+  const res = await authFetch(api(`/layouts/${layoutId}/render/pdf`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ data, filename }),
@@ -226,7 +247,7 @@ export async function renderLayoutPdfBatch(
   rows: any[],
   filenamePrefix?: string
 ): Promise<{ files: Array<{ index: number; file: string }>; zip?: string }> {
-  const res = await fetch(api(`/layouts/${layoutId}/render/pdf-batch`), {
+  const res = await authFetch(api(`/layouts/${layoutId}/render/pdf-batch`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rows, filenamePrefix }),
@@ -240,16 +261,7 @@ export async function renderLayoutPdfBatch(
 
 /** helper to construct full zip url returned as /tmp/<name>.zip from backend */
 export function zipDownloadUrl(zipPath?: string): string | null {
-  if (!zipPath) return null;
-
-  try {
-    // Build against current origin if API_BASE is relative; otherwise use API_BASE origin
-    const base = new URL(API_BASE, window.location.origin);
-    return `${base.origin}${zipPath}`;
-  } catch {
-    // very defensive fallback
-    return `${window.location.origin}${zipPath}`;
-  }
+  return absoluteUrl(zipPath);
 }
 
 /* ---------------- WORKFLOWS ---------------- */
@@ -266,10 +278,13 @@ export type WorkflowRecord = {
   updatedAt?: string | Date;
   isActive?: boolean;
   tags?: string[];
+  // optional top-level settings some UIs persist
+  outputFormats?: string[];
+  deliveryMode?: string;
 };
 
 export async function getWorkflows(): Promise<WorkflowRecord[]> {
-  const res = await fetch(api("/workflows"), { method: "GET" });
+  const res = await authFetch(api("/workflows"), { method: "GET" });
   if (!res.ok)
     throw new Error(
       `Failed to fetch workflows: ${res.status} ${await res.text()}`
@@ -296,7 +311,7 @@ export async function upsertWorkflow(
   });
 
   if (id) {
-    const putRes = await fetch(api(`/workflows/${id}`), {
+    const putRes = await authFetch(api(`/workflows/${id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body,
@@ -306,7 +321,7 @@ export async function upsertWorkflow(
 
     // If backend doesn’t support PUT or record missing, try create
     if ([404, 405, 400].includes(putRes.status)) {
-      const postRes = await fetch(api("/workflows"), {
+      const postRes = await authFetch(api("/workflows"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
@@ -325,7 +340,7 @@ export async function upsertWorkflow(
   }
 
   // No id → create
-  const postRes = await fetch(api("/workflows"), {
+  const postRes = await authFetch(api("/workflows"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body,
@@ -369,75 +384,77 @@ export type WorkflowExecutionRecord = {
   updatedAt?: string | Date;
 };
 
-/** List executions (optionally filter by workflowId/status/limit) */
 export async function listExecutions(params?: {
   workflowId?: string;
   status?: string;
   limit?: number;
 }): Promise<WorkflowExecutionRecord[]> {
-  const u = new URL(api("/executions"), window.location.origin);
+  const u = new URL(api("/workflow-executions"), window.location.origin);
   if (params?.workflowId) u.searchParams.set("workflowId", params.workflowId);
-  if (params?.status) u.searchParams.set("status", params.status);
-  if (params?.limit) u.searchParams.set("limit", String(params.limit));
-  const res = await fetch(u.toString());
-  if (!res.ok)
-    throw new Error(
-      `listExecutions failed: ${res.status} ${await res.text()}`
-    );
+  if (params?.status)     u.searchParams.set("status", params.status);
+  if (params?.limit)      u.searchParams.set("limit", String(params.limit));
+  const res = await authFetch(u.toString());
+  if (!res.ok) throw new Error(`listExecutions failed: ${res.status} ${await res.text()}`);
   return res.json();
 }
 
-/** Get a single execution */
-export async function getExecution(
-  id: string
-): Promise<WorkflowExecutionRecord> {
-  const res = await fetch(api(`/executions/${id}`));
-  if (!res.ok)
-    throw new Error(
-      `getExecution failed: ${res.status} ${await res.text()}`
-    );
+export async function getExecution(id: string): Promise<WorkflowExecutionRecord> {
+  const res = await authFetch(api(`/workflow-executions/${id}`));
+  if (!res.ok) throw new Error(`getExecution failed: ${res.status} ${await res.text()}`);
   return res.json();
 }
 
-/** Delete an execution */
-export async function deleteExecution(
-  id: string
-): Promise<{ ok: boolean }> {
-  const res = await fetch(api(`/executions/${id}`), { method: "DELETE" });
-  if (!res.ok)
-    throw new Error(
-      `deleteExecution failed: ${res.status} ${await res.text()}`
-    );
+export async function deleteExecution(id: string): Promise<{ ok: boolean }> {
+  const res = await authFetch(api(`/workflow-executions/${id}`), { method: "DELETE" });
+  if (!res.ok) throw new Error(`deleteExecution failed: ${res.status} ${await res.text()}`);
   return res.json();
 }
 
-/**
- * Persist a workflow execution (Job).
- * Tries POST /workflows/:workflowId/executions, falls back to /executions.
- */
 export async function recordWorkflowExecution(
   exec: Partial<WorkflowExecutionRecord>
 ): Promise<WorkflowExecutionRecord> {
-  if (!exec.workflowId)
-    throw new Error("recordWorkflowExecution: 'workflowId' is required");
+  if (!exec.workflowId) throw new Error("recordWorkflowExecution: 'workflowId' is required");
+  const res = await authFetch(api(`/workflow-executions`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(exec),
+  });
+  if (!res.ok) throw new Error(`recordWorkflowExecution failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
 
-  const tryPost = async (url: string) =>
-    fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(exec),
-    });
+/* ---------------- DELIVERY ---------------- */
+export async function deliverToApi(payload: {
+  endpoint: string;
+  method?: string;
+  headers?: Record<string,string>;
+  data?: any;
+  outputs?: Array<{ url?: string; file?: string; href?: string; filename?: string; fieldName?: string }>;
+  mode?: 'links' | 'multipart';
+}) {
+  const res = await authFetch(api('/delivery/api'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`deliver api failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
 
-  // Preferred nested route
-  let res = await tryPost(api(`/workflows/${exec.workflowId}/executions`));
-  if (!res.ok) {
-    // Fallback flat route
-    res = await tryPost(api("/executions"));
-  }
-  if (!res.ok) {
-    throw new Error(
-      `recordWorkflowExecution failed: ${res.status} ${await res.text()}`
-    );
-  }
+export async function deliverToFtp(payload: {
+  host: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  secure?: boolean;
+  remoteDir?: string;
+  files: Array<{ url?: string; file?: string; href?: string; filename?: string }>;
+}) {
+  const res = await authFetch(api('/delivery/ftp'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`deliver ftp failed: ${res.status} ${await res.text()}`);
   return res.json();
 }

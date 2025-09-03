@@ -1,11 +1,12 @@
 import { API_BASE } from "../api";
+import { authFetch } from "../auth";
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
-import { Trash2, Download, RotateCcw } from "lucide-react";
+import { Trash2, RotateCcw } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -61,7 +62,12 @@ const parseTableColumns = (spec: string): string[] => {
     .filter(Boolean);
 };
 
-const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templates = [] }) => {
+
+// Sanitize names for display (normalize and replace dash-like glyphs)
+const displayName = (s: string) =>
+  String(s ?? '')
+    .normalize('NFKC')
+    .replace(/[\u2012-\u2015\u2212]/g, '-');const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templates = [] }) => {
   const [zones, setZones] = useState<LayoutZone[]>([]);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -207,7 +213,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templ
     }
     try {
       const payload = { name: layoutName.trim(), structure: { zones } };
-      const res = await fetch(`${API_BASE}/layouts`, {
+      const res = await authFetch(`${API_BASE}/layouts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -229,12 +235,38 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templ
 
   const fetchSavedLayouts = async () => {
     try {
-      const res = await fetch(`${API_BASE}/layouts`);
+      const res = await authFetch(`${API_BASE}/layouts`);
       if (!res.ok) throw new Error("Failed to fetch saved layouts");
       const data = await res.json();
       setSavedLayouts(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const deleteLayoutFromServer = async () => {
+    const id = selectedLayoutId || String(savedLayouts.find((l) => (l.name || "") === layoutName)?._id || (savedLayouts.find((l) => (l.name || "") === layoutName) as any)?.id || "");
+    if (!id) {
+      alert("Select a saved layout to delete.");
+      return;
+    }
+    const layout = savedLayouts.find((l, i) => String(l._id || (l as any).id || i) === id);
+    const name = layout?.name || layoutName || id;
+    const ok = window.confirm(`Delete layout "${name}"? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      const res = await authFetch(`${API_BASE}/layouts/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`Delete failed: ${res.statusText}`);
+      await res.json().catch(() => ({}));
+      // Refresh list and clear selection
+      await fetchSavedLayouts();
+      setSelectedLayoutId("");
+      // keep current canvas; only clear name if it was the deleted one
+      if (name === layoutName) setLayoutName("");
+      alert("Layout deleted");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete layout. See console for details.");
     }
   };
 
@@ -346,7 +378,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templ
                   const id = String(l._id || (l as any).id || i);
                   return (
                     <SelectItem key={id} value={id} className="text-xs">
-                      {l.name || "(untitled)"}
+                      {displayName(l.name || "(untitled)")}
                     </SelectItem>
                   );
                 })
@@ -384,11 +416,14 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templ
             <Button onClick={saveLayoutToServer} className="w-full h-8 text-xs">
               Save Layout
             </Button>
-            <Button onClick={fetchSavedLayouts} variant="outline" className="w-full h-8 text-xs">
-              Refresh Saved
-            </Button>
-            <Button onClick={() => handleExport("json")} variant="ghost" className="w-full h-8 text-xs">
-              <Download className="w-3 h-3 mr-2" /> Export (JSON)
+            <Button
+              onClick={deleteLayoutFromServer}
+              variant="destructive"
+              className="w-full h-8 text-xs"
+              disabled={!selectedLayoutId}
+              title={!selectedLayoutId ? "Select a saved layout first" : "Delete selected layout"}
+            >
+              <Trash2 className="w-3 h-3 mr-2" /> Delete Layout
             </Button>
           </div>
         </div>
@@ -399,7 +434,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templ
         <div className="border-b px-3 py-2 bg-card shrink-0 flex items-center justify-between">
           <div>
             <h2 className="text-sm">Layout Canvas</h2>
-            <p className="text-xs text-muted-foreground">Zoom with Ctrl/⌘ + mouse wheel. Drag zones to move.</p>
+            <p className="text-xs text-muted-foreground">Zoom with Ctrl/Cmd + mouse wheel. Drag zones to move.</p>
           </div>
 
           {/* Zoom controls */}
@@ -422,7 +457,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templ
                   setScale((s) => clamp(s * 0.9, MIN_SCALE, MAX_SCALE));
                 }}
               >
-                −
+                -
               </Button>
               <div className="w-16 text-center text-xs tabular-nums">{(scale * 100).toFixed(0)}%</div>
               <Button
@@ -530,8 +565,8 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templ
                                 </div>
                                 <div className="text-muted-foreground px-2 py-1">
                                   {zone.isDynamic
-                                    ? `rows: {{${zone.variableName}}}`
-                                    : "(Static preview — provide rows via data={{VarName}})"}
+                                    ? ("rows: {{" + String(zone.variableName ?? "") + "}}")
+                                    : "(Static preview - provide rows via data={{VarName}})" }
                                 </div>
                               </>
                             );
@@ -805,7 +840,7 @@ const LayoutDesigner: React.FC<LayoutDesignerProps> = ({ onExport, onSave, templ
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {templates.map((tpl) => (
                 <div key={tpl.id} className="border rounded p-3 flex flex-col">
-                  <div className="font-medium">{tpl.name}</div>
+                  <div className="font-medium">{displayName(tpl.name)}</div>
                   {tpl.description && (
                     <div className="text-xs text-muted-foreground mb-2">{tpl.description}</div>
                   )}

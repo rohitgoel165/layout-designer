@@ -9,6 +9,15 @@ export const LABEL_SM = "text-[11px]";
 
 export type TablePayload = { columns: string[]; data: (string | number)[][] };
 
+/** NEW: restrict output to PDF and QR only */
+export type OutputFormat = "pdf" | "qrcode";
+/** NEW: delivery modes */
+export type DeliveryMode = "ftp" | "api" | "email";
+
+/** Optional sensible defaults you can reuse in UI/state */
+export const DEFAULT_OUTPUT_FORMATS: OutputFormat[] = ["pdf"];
+export const DEFAULT_DELIVERY_MODE: DeliveryMode = "api";
+
 export interface WorkflowNode {
   id: string;
   type: "input" | "processing" | "output";
@@ -41,6 +50,27 @@ export interface Workflow {
   updatedAt: Date;
   isActive: boolean;
   tags: string[];
+
+  /** NEW: keep only PDF & QR for now */
+  outputFormats?: OutputFormat[]; // optional to avoid breaking existing data
+  /** NEW: ftp | api | email */
+  deliveryMode?: DeliveryMode;    // optional to avoid breaking existing data
+
+  /** Optional top-level delivery settings */
+  apiDelivery?: {
+    endpoint?: string;
+    method?: string;
+    headers?: Record<string, string> | string;
+    mode?: 'links' | 'multipart';
+  };
+  ftpDelivery?: {
+    host?: string;
+    port?: number;
+    user?: string;
+    password?: string;
+    remoteDir?: string;
+    secure?: boolean;
+  };
 }
 
 export interface WorkflowExecution {

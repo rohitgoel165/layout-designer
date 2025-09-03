@@ -7,6 +7,12 @@ import { toast } from "sonner";
 import LayoutDesigner from "./components/LayoutDesigner";
 import type { LayoutZone } from "./components/LayoutDesigner";
 import PRESET_TEMPLATES from "./templates/presets";
+// Normalize template names to avoid odd dash glyphs showing as replacement chars
+const normalizeName = (s: string) =>
+  String(s)
+    .normalize("NFKC")
+    // replace dash-like unicode with a plain hyphen
+    .replace(/[\u2012-\u2015\u2212]/g, "-");
 
 // ✅ Import only the component here
 import JobsDashboard from "./components/JobsDashboard";
@@ -16,9 +22,12 @@ import type { Job, LogEntry } from "./types";
 
 import { VersionControl, LayoutVersion } from "./components/VersionControl";
 import { Migration, MigrationTransaction } from "./components/Migration";
-import { WorkflowDesigner, Workflow, WorkflowExecution } from "./components/WorkflowDesigner";
+import WorkflowDesigner from "./components/WorkflowDesigner";
+import type { Workflow, WorkflowExecution } from "./components/WorkflowDesigner/types";
 
 import { Layout, Briefcase, GitBranch, ArrowRightLeft, Workflow as WorkflowIcon } from "lucide-react";
+import { listExecutions } from "./api";
+import type { WorkflowExecutionRecord } from "./api";
 console.log("PRESETS:", PRESET_TEMPLATES.map(p => p.id));
 
 // NEW: include JSON as a supported export format to match LayoutDesigner
@@ -191,11 +200,73 @@ export default function App() {
       },
     ];
 
-    setJobs(sampleJobs);
+    // setJobs(sampleJobs); // disabled: load real executions instead
     setVersions(sampleVersions);
     setWorkflows(sampleWorkflows);
     setCurrentVersion(sampleVersions.find((v) => v.isActive) || sampleVersions[0]);
   }, []);
+
+  // Map backend execution record to JobsDashboard Job
+  const toJob = (rec: any): Job => {
+    const rawId = rec.jobId ?? rec.id ?? rec._id ?? Date.now();
+    const id = (/^\d+$/.test(String(rawId)) ? `exec-${rawId}` : String(rawId));
+    const outputs = Array.isArray(rec.results)
+      ? rec.results.map((r: any) => ({ type: r.outputType || r.type, url: r.url || r.data, data: r.data }))
+       : Array.isArray(rec.responseData?.outputs) ? (rec.responseData.outputs as any[]).map((r:any)=>({ type: r.outputType || r.type, url: r.url || r.data, data: r.data }))
+      : [];
+    const logs = Array.isArray(rec.logs)
+      ? rec.logs.map((l: any, i: number) => ({
+          id: String(l.id ?? `${id}-log-${i}`),
+          timestamp: l.timestamp || new Date(),
+          level: l.level || "info",
+          message: l.message || "",
+          nodeId: l.nodeId,
+        }))
+      : [];
+    return {
+      id,
+      layoutId: String(rec.workflowId || ""),
+      layoutName: rec.layoutName || rec.workflowName || "",
+      type: "workflow",
+      format: rec.format,
+      status: rec.status || "pending",
+      progress: typeof rec.progress === "number" ? rec.progress : 0,
+      createdAt: rec.startTime || rec.createdAt || new Date(),
+      completedAt: rec.completedAt || rec.endTime,
+      requestData: rec.requestData ?? rec.inputData,
+      responseData: outputs.length ? { outputs } : (rec.responseData || undefined),
+      logs,
+      workflowId: String(rec.workflowId || ""),
+      executedNodes: outputs.length,
+      errorMessage: rec.errorMessage,
+    } as Job;
+  };
+
+  // Load jobs from backend and keep in sync
+  const refreshJobs = async () => {
+    try {
+      const execs = await listExecutions({ limit: 200 });
+      setJobs(execs.map(toJob));
+    } catch (e) {
+      console.warn("Failed to load executions:", e);
+    }
+  };
+
+  useEffect(() => {
+    refreshJobs();
+    const onCreated = () => refreshJobs();
+    window.addEventListener("jobs:created", onCreated as any);
+    return () => window.removeEventListener("jobs:created", onCreated as any);
+  }, []);
+
+  // Persist last active tab across refreshes
+  useEffect(() => {
+    const last = sessionStorage.getItem("activeTab");
+    if (last) setActiveTab(last);
+  }, []);
+  useEffect(() => {
+    try { sessionStorage.setItem("activeTab", activeTab); } catch {}
+  }, [activeTab]);
 
 // Accept string to satisfy LayoutDesigner, then normalize to our allowed set
 const handleExport = async (format: string, exportZones: LayoutZone[]) => {
@@ -611,3 +682,4 @@ const handleExport = async (format: string, exportZones: LayoutZone[]) => {
     </div>
   );
 }
+

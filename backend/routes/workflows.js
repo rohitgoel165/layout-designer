@@ -1,6 +1,7 @@
 // backend/routes/workflows.js
 import express from "express";
 import { createRequire } from "module";
+import { Op } from "sequelize";
 
 const router = express.Router();
 const require = createRequire(import.meta.url);
@@ -76,8 +77,14 @@ router.get("/", asyncHandler(async (req, res) => {
     where.isActive = String(req.query.isActive).toLowerCase() !== "false";
   }
   if (req.query.q) {
-    // simple name search (Postgres ILIKE when supported)
-    where.name = { [Workflow.sequelize.Op ? Workflow.sequelize.Op.iLike : "like"]: `%${req.query.q}%` };
+    // Simple name search; prefer ILIKE on Postgres, LIKE otherwise.
+    const dialect = typeof Workflow?.sequelize?.getDialect === "function"
+      ? Workflow.sequelize.getDialect()
+      : undefined;
+    const isPg = (dialect || "").toLowerCase() === "postgres";
+    where.name = isPg
+      ? { [Op.iLike]: `%${req.query.q}%` }
+      : { [Op.like]: `%${req.query.q}%` };
   }
 
   const limit = toInt(req.query.limit, 100);

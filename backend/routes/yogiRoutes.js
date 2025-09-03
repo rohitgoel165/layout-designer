@@ -6,6 +6,10 @@ const router = express.Router();
 
 const BASE = (process.env.YOGI_BASE_URL || "").replace(/\/+$/, "");
 const TOKEN = process.env.YOGI_BEARER_TOKEN || "";
+const AUTH_MODE = (process.env.YOGI_AUTH_MODE || (TOKEN ? "env" : "passthrough")).toLowerCase();
+// env: always use YOGI_BEARER_TOKEN
+// passthrough: forward incoming Authorization header
+// prefer-env: use incoming Authorization if present, else fall back to YOGI_BEARER_TOKEN
 const TIMEOUT_MS = Number(process.env.YOGI_TIMEOUT_MS ?? 15000);
 
 if (!BASE || !TOKEN) {
@@ -30,8 +34,25 @@ const forwardHeaders = (req) => {
     const v = req.headers[k];
     if (v) h.set(k, String(v));
   }
-  // Auth: always override with Yogi bearer
-  h.set("authorization", `Bearer ${TOKEN}`);
+  // Auth strategy
+  const incomingAuth = req.headers["authorization"]; // e.g. "Bearer <entry_jwt>"
+  if (AUTH_MODE === "passthrough") {
+    if (incomingAuth) h.set("authorization", String(incomingAuth));
+  } else if (AUTH_MODE === "prefer-env") {
+    if (incomingAuth) {
+      h.set("authorization", String(incomingAuth));
+    } else if (TOKEN) {
+      h.set("authorization", `Bearer ${TOKEN}`);
+    }
+  } else {
+    // default: env
+    if (TOKEN) h.set("authorization", `Bearer ${TOKEN}`);
+  }
+
+  // Also forward an entry token header if the caller provided one explicitly
+  if (req.headers["x-entry-token"]) {
+    h.set("x-entry-token", String(req.headers["x-entry-token"]));
+  }
   // Only set content-type when we actually send a body
   return h;
 };
